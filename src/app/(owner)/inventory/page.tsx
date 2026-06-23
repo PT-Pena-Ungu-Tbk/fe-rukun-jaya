@@ -1,194 +1,340 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import TopNav from "@/components/layout/TopNav";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { inventoryApi } from "@/lib/api";
-import { mockProducts } from "@/lib/mockData";
-import StockBadge from "@/components/ui/StockBadge";
+import { Plus, Pencil, Trash2, Ban, ChevronDown, X, Save, Loader2, AlertTriangle, RefreshCw } from "lucide-react";
+// ChevronDown reused as "trending down" icon for stat cards
+import Link from "next/link";
 import { formatRupiah } from "@/lib/utils";
-import { Plus, Edit2, Trash2, ChevronLeft, ChevronRight, Package } from "lucide-react";
 import toast from "react-hot-toast";
-import type { CreateProductRequest } from "@/types";
+import { inventoryApi } from "@/lib/api";
+import type { Product } from "@/types";
 
-const CATEGORIES = ["All", "Cement & Sand", "Steel", "Hardware", "Paints", "Timber", "Pipes & Fittings"];
+type InventoryItem = Product & { _displayStok?: number };
+
+const MOCK_ITEMS: InventoryItem[] = [
+  { id: "INV-001", sku_code: "SMN-TR50", name: "Semen Tiga Roda 50kg", category: "Semen", supplier: "-", buy_price: "48000", sell_price: "55000", current_stock: 145, defective_stock: 0, min_stock: 30, rack_location: "A1-R01" },
+  { id: "INV-089", sku_code: "PKB-5CM", name: "Paku Beton 5cm", category: "Paku", supplier: "-", buy_price: "12000", sell_price: "15000", current_stock: 0, defective_stock: 0, min_stock: 20, rack_location: "C3-R12" },
+  { id: "INV-042", sku_code: "CAT-DLX5", name: "Cat Tembok Dulux Putih 5kg", category: "Cat", supplier: "-", buy_price: "115000", sell_price: "135000", current_stock: 24, defective_stock: 0, min_stock: 10, rack_location: "B2-R05" },
+  { id: "INV-112", sku_code: "PPA-WAV12", name: "Pipa PVC Wavin 1/2\"", category: "Pipa", supplier: "-", buy_price: "22000", sell_price: "28000", current_stock: 18, defective_stock: 2, min_stock: 20, rack_location: "D1-R08" },
+  { id: "INV-005", sku_code: "SMN-HLC40", name: "Semen Holcim 40kg", category: "Semen", supplier: "-", buy_price: "42000", sell_price: "49000", current_stock: 88, defective_stock: 0, min_stock: 30, rack_location: "A1-R02" },
+  { id: "INV-215", sku_code: "PPA-WAV3", name: "Pipa PVC Wavin 3 Inch", category: "Pipa", supplier: "-", buy_price: "35000", sell_price: "45000", current_stock: 75, defective_stock: 0, min_stock: 20, rack_location: "B-12" },
+];
+
+const emptyForm = { nama_barang: "", kategori: "", kondisi: "Baru" as const, jumlah_stok_awal: 0, satuan: "", kode_rak: "", harga_beli: 0, harga_jual: 0, tanggal_kadaluarsa: "" };
 
 export default function InventoryPage() {
+  const [items, setItems] = useState<InventoryItem[]>(MOCK_ITEMS);
   const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("All");
-  const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState<Partial<CreateProductRequest>>({});
-  const qc = useQueryClient();
+  const [filterKategori, setFilterKategori] = useState("Semua Kategori");
+  const [filterStatus, setFilterStatus] = useState("Semua Status");
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState<InventoryItem | null>(null);
+  const [form, setForm] = useState(emptyForm);
+  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [summary, setSummary] = useState({ stok_habis: 0, di_bawah_minimum: 0, akan_expired: 0 });
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["products", search],
-    queryFn: () => inventoryApi.getProducts({ search }),
+  useEffect(() => {
+    inventoryApi.getProducts()
+      .then((res) => {
+        if (res.data?.length) setItems(res.data);
+      })
+      .catch(() => { /* keep mock data */ })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const filtered = items.filter((item) => {
+    const matchSearch = item.name.toLowerCase().includes(search.toLowerCase()) || item.id.toLowerCase().includes(search.toLowerCase()) || item.sku_code.toLowerCase().includes(search.toLowerCase());
+    const matchStatus = filterStatus === "Semua Status" ||
+      (filterStatus === "Stok Habis" && item.current_stock === 0) ||
+      (filterStatus === "Stok Rendah" && item.current_stock > 0 && item.current_stock <= item.min_stock) ||
+      (filterStatus === "In Stock" && item.current_stock > item.min_stock);
+    return matchSearch && matchStatus;
   });
 
-  const products = data?.data ?? mockProducts;
-  const filtered = products.filter(
-    (p) => category === "All" || p.category === category
-  );
+  const localSummary = {
+    stokHabis: summary.stok_habis || items.filter((i) => i.current_stock === 0).length,
+    dibawahMin: summary.di_bawah_minimum || items.filter((i) => i.current_stock > 0 && i.current_stock <= i.min_stock).length,
+    akanExpired: summary.akan_expired || 0,
+  };
 
-  const createMutation = useMutation({
-    mutationFn: inventoryApi.createProduct,
-    onSuccess: () => {
-      toast.success("Produk berhasil ditambahkan!");
-      qc.invalidateQueries({ queryKey: ["products"] });
-      setShowModal(false);
-      setForm({});
-    },
-    onError: () => toast.error("Gagal menambah produk."),
-  });
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await inventoryApi.createProduct({
+        sku_code: form.nama_barang.toUpperCase().replace(/\s+/g, "-").slice(0, 12),
+        name: form.nama_barang,
+        buy_price: form.harga_beli,
+        sell_price: form.harga_jual,
+        current_stock: form.jumlah_stok_awal,
+        min_stock: 10,
+        rack_location: form.kode_rak,
+      });
+      toast.success("Barang berhasil ditambahkan!");
+      setShowAddModal(false);
+      setForm(emptyForm);
+      // Refresh list
+      const res = await inventoryApi.getProducts();
+      if (res.data?.length) setItems(res.data);
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(msg ?? "Gagal menambahkan barang");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const kondisiBadge = (k: string) => {
+    if (k === "Rusak Ringan") return <span className="px-2.5 py-0.5 text-xs font-medium bg-amber-100 text-amber-700 rounded-md">{k}</span>;
+    if (k === "Rusak Berat") return <span className="px-2.5 py-0.5 text-xs font-medium bg-red-100 text-red-700 rounded-md">{k}</span>;
+    return <span className="px-2.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 rounded-md">{k}</span>;
+  };
 
   return (
-    <div className="flex flex-col h-full">
-      <TopNav
-        title="Inventory Management"
-        searchPlaceholder="Search SKU, Product..."
-        onSearch={setSearch}
-      />
-      <div className="p-6 overflow-auto">
-        <div className="flex items-center justify-between mb-5">
-          <div>
-            <h2 className="text-xl font-bold text-slate-800">Inventory Management</h2>
-            <p className="text-sm text-slate-500">Kelola seluruh produk dan data master inventaris.</p>
+    <div className="flex-1 flex flex-col min-h-screen">
+      <TopNav />
+      <main className="flex-1 p-6 animate-fade-in">
+        <div className="mb-5">
+          <h1 className="text-2xl font-bold text-gray-900">Inventaris Barang</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Kelola data seluruh material dan produk di gudang utama.</p>
+        </div>
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-3 gap-4 mb-5 animate-slide-up">
+          {/* Stok Habis */}
+          <div className="relative overflow-hidden bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-red-50 rounded-full -translate-y-8 translate-x-8 opacity-60" />
+            <div className="relative">
+              <Ban size={22} className="text-red-500 mb-3" />
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Stok Habis</p>
+              <p className="text-4xl font-bold text-red-600 leading-none">{localSummary.stokHabis}</p>
+              <p className="text-sm text-gray-400 mt-1">Items</p>
+            </div>
           </div>
-          <button
-            onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700"
-          >
-            <Plus className="w-4 h-4" />
-            Add Product
-          </button>
+          {/* Dibawah Minimum */}
+          <div className="relative overflow-hidden bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-amber-50 rounded-full -translate-y-8 translate-x-8 opacity-60" />
+            <div className="relative">
+              <ChevronDown size={22} className="text-amber-500 mb-3" />
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Dibawah Minimum</p>
+              <p className="text-4xl font-bold text-amber-500 leading-none">{localSummary.dibawahMin}</p>
+              <p className="text-sm text-gray-400 mt-1">Items</p>
+            </div>
+          </div>
+          {/* Barang Akan Expired */}
+          <div className="relative overflow-hidden bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-green-50 rounded-full -translate-y-8 translate-x-8 opacity-60" />
+            <div className="relative">
+              <ChevronDown size={22} className="text-green-500 mb-3" />
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Barang Akan Expired</p>
+              <p className="text-4xl font-bold text-green-600 leading-none">{localSummary.akanExpired}</p>
+              <p className="text-sm text-gray-400 mt-1">Items</p>
+            </div>
+          </div>
         </div>
 
-        {/* Category Tabs */}
-        <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
-          {CATEGORIES.map((c) => (
-            <button
-              key={c}
-              onClick={() => setCategory(c)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-full whitespace-nowrap transition-colors ${
-                category === c
-                  ? "bg-blue-600 text-white"
-                  : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
-              }`}
-            >
-              {c}
-            </button>
-          ))}
-        </div>
+        {/* Table Card */}
+        <div className="page-card animate-slide-up stagger-2">
+          {/* Toolbar */}
+          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+            <div className="flex items-center gap-2">
+              <select value={filterKategori} onChange={(e) => setFilterKategori(e.target.value)}
+                className="form-select text-sm py-2">
+                <option>Semua Kategori</option>
+                <option>Semen</option><option>Besi</option><option>Cat</option><option>Pipa</option>
+              </select>
+              <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
+                className="form-select text-sm py-2">
+                <option>Semua Status</option>
+                <option>In Stock</option><option>Stok Rendah</option><option>Stok Habis</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <Link href="/inventory/bulk-update" className="btn-secondary text-xs py-2">
+                <RefreshCw size={14} /> Perbarui Sekaligus
+              </Link>
+              <button onClick={() => setShowAddModal(true)} className="btn-primary text-xs py-2">
+                <Plus size={14} /> Tambah Barang
+              </button>
+            </div>
+          </div>
 
-        {/* Table */}
-        <div className="bg-white rounded-xl border border-slate-200">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Product Name</th>
-                <th>SKU Code</th>
-                <th>Category</th>
-                <th>Supplier</th>
-                <th>Buy Price</th>
-                <th>Sell Price</th>
-                <th>Stock</th>
-                <th>Min</th>
-                <th>Rack</th>
-                <th>Status</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                <tr><td colSpan={11} className="text-center py-8 text-slate-400">Loading...</td></tr>
-              ) : filtered.length === 0 ? (
-                <tr><td colSpan={11} className="text-center py-8 text-slate-400">Tidak ada produk ditemukan.</td></tr>
-              ) : (
-                filtered.map((p) => (
-                  <tr key={p.id}>
-                    <td className="text-xs font-medium text-blue-600">{p.name}</td>
-                    <td className="text-xs font-mono text-slate-500">{p.sku_code}</td>
-                    <td className="text-xs text-slate-600">{p.category}</td>
-                    <td className="text-xs text-slate-600">{p.supplier}</td>
-                    <td className="text-xs text-slate-700">{formatRupiah(p.buy_price)}</td>
-                    <td className="text-xs font-semibold text-slate-800">{formatRupiah(p.sell_price)}</td>
-                    <td className="text-xs font-semibold">{p.current_stock.toLocaleString()}</td>
-                    <td className="text-xs text-slate-500">{p.min_stock}</td>
-                    <td className="text-xs text-slate-500">{p.rack_location}</td>
-                    <td><StockBadge product={p} /></td>
+          {/* Table */}
+          <div className="overflow-x-auto">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th><input type="checkbox" className="rounded" /></th>
+                  <th>ID</th>
+                  <th>Nama Barang</th>
+                  <th>Kondisi</th>
+                  <th>Stok</th>
+                  <th>Harga Beli</th>
+                  <th>Harga Jual</th>
+                  <th>Exp. Date</th>
+                  <th>Rak</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((item) => (
+                  <tr key={item.id} className="animate-fade-in">
+                    <td><input type="checkbox" className="rounded" /></td>
+                    <td className="font-mono text-xs text-gray-500">{item.id}</td>
                     <td>
-                      <div className="flex gap-1">
-                        <button className="p-1 text-blue-500 hover:bg-blue-50 rounded"><Edit2 className="w-3.5 h-3.5" /></button>
-                        <button className="p-1 text-red-400 hover:bg-red-50 rounded"><Trash2 className="w-3.5 h-3.5" /></button>
+                      <Link href={`/inventory/${item.id}`} className={`font-medium hover:underline ${item.current_stock === 0 ? "text-red-600" : "text-gray-800"}`}>
+                        {item.name}
+                      </Link>
+                    </td>
+                    <td>{kondisiBadge(item.defective_stock > 0 ? "Rusak Ringan" : "Baru")}</td>
+                    <td>
+                      <span className={`font-semibold ${item.current_stock === 0 ? "text-red-600" : item.current_stock <= item.min_stock ? "text-amber-600" : "text-gray-800"}`}>
+                        {item.current_stock}
+                      </span>{" "}
+                      <span className="text-gray-400 text-xs">unit</span>
+                    </td>
+                    <td className="text-gray-700">{formatRupiah(Number(item.buy_price))}</td>
+                    <td className="text-gray-700">{formatRupiah(Number(item.sell_price))}</td>
+                    <td className="text-gray-500 text-xs">
+                      -
+                    </td>
+                    <td>
+                      <Link href={`/inventory/${item.id}`} className="text-blue-600 hover:underline text-xs font-mono">
+                        {item.rack_location}
+                      </Link>
+                    </td>
+                    <td>
+                      <div className="flex items-center gap-1">
+                        <button className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors">
+                          <Pencil size={13} />
+                        </button>
+                        <button onClick={() => setShowDeleteModal(item)}
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors">
+                          <Trash2 size={13} />
+                        </button>
                       </div>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-          <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100">
-            <p className="text-xs text-slate-400">Showing {filtered.length} items</p>
-            <div className="flex gap-1">
-              <button className="p-1 hover:bg-slate-100 rounded"><ChevronLeft className="w-4 h-4 text-slate-400" /></button>
-              <button className="p-1 hover:bg-slate-100 rounded"><ChevronRight className="w-4 h-4 text-slate-400" /></button>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 text-sm text-gray-500">
+            <span>Menampilkan 1-{filtered.length} dari 1,248 barang</span>
+            <div className="flex items-center gap-1">
+              <button className="w-7 h-7 rounded text-xs hover:bg-gray-100 text-gray-500">‹</button>
+              {[1, 2, 3].map((p) => (
+                <button key={p} className={`w-7 h-7 rounded text-xs ${p === 1 ? "bg-blue-600 text-white" : "hover:bg-gray-100 text-gray-600"}`}>{p}</button>
+              ))}
+              <span className="w-7 h-7 flex items-center justify-center text-xs text-gray-400">...</span>
+              <button className="w-7 h-7 rounded text-xs hover:bg-gray-100 text-gray-600">250</button>
+              <button className="w-7 h-7 rounded text-xs hover:bg-gray-100 text-gray-500">›</button>
             </div>
           </div>
         </div>
-      </div>
+      </main>
 
-      {/* Add Product Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-xl">
-            <div className="flex items-center gap-3 mb-5">
-              <Package className="w-5 h-5 text-blue-600" />
-              <h3 className="text-lg font-bold text-slate-800">Add New Product</h3>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="col-span-2">
-                <label className="block text-xs font-medium text-slate-600 mb-1">SKU Code</label>
-                <input value={form.sku_code ?? ""} onChange={(e) => setForm({ ...form, sku_code: e.target.value })} placeholder="SKU-XXX-001" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400" />
-              </div>
-              <div className="col-span-2">
-                <label className="block text-xs font-medium text-slate-600 mb-1">Product Name</label>
-                <input value={form.name ?? ""} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Nama produk" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Buy Price (Rp)</label>
-                <input type="number" value={form.buy_price ?? ""} onChange={(e) => setForm({ ...form, buy_price: +e.target.value })} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Sell Price (Rp)</label>
-                <input type="number" value={form.sell_price ?? ""} onChange={(e) => setForm({ ...form, sell_price: +e.target.value })} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Initial Stock</label>
-                <input type="number" value={form.current_stock ?? ""} onChange={(e) => setForm({ ...form, current_stock: +e.target.value })} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Min Stock</label>
-                <input type="number" value={form.min_stock ?? ""} onChange={(e) => setForm({ ...form, min_stock: +e.target.value })} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400" />
-              </div>
-              <div className="col-span-2">
-                <label className="block text-xs font-medium text-slate-600 mb-1">Rack Location</label>
-                <input value={form.rack_location ?? ""} onChange={(e) => setForm({ ...form, rack_location: e.target.value })} placeholder="R-A1-01" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400" />
-              </div>
-            </div>
-            <div className="flex gap-3 mt-5">
-              <button
-                onClick={() => { setShowModal(false); setForm({}); }}
-                className="flex-1 py-2.5 border border-slate-200 text-sm font-medium text-slate-600 rounded-lg hover:bg-slate-50"
-              >
-                Batal
+      {/* Add Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 modal-overlay">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl modal-content mx-4">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <h3 className="text-base font-bold text-gray-900">Tambah Barang Baru</h3>
+              <button onClick={() => setShowAddModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X size={18} />
               </button>
-              <button
-                onClick={() => createMutation.mutate(form as CreateProductRequest)}
-                disabled={createMutation.isPending}
-                className="flex-1 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-60"
-              >
-                {createMutation.isPending ? "Menyimpan..." : "Save Product"}
+            </div>
+            <div className="px-6 py-5 space-y-4 max-h-[70vh] overflow-y-auto">
+              <div>
+                <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-3">Informasi Dasar</p>
+                <div className="space-y-3">
+                  <div>
+                    <label className="form-label">Nama Barang *</label>
+                    <input value={form.nama_barang} onChange={(e) => setForm({ ...form, nama_barang: e.target.value })}
+                      placeholder="Contoh: Semen Gresik 50kg" className="form-input" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="form-label">Kategori *</label>
+                      <select value={form.kategori} onChange={(e) => setForm({ ...form, kategori: e.target.value })} className="form-select">
+                        <option value="">Pilih Kategori</option>
+                        <option>Semen</option><option>Besi</option><option>Cat</option><option>Pipa</option><option>Kayu</option><option>Hardware</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="form-label">Kondisi</label>
+                      <select value={form.kondisi} onChange={(e) => setForm({ ...form, kondisi: e.target.value as "Baru" })} className="form-select">
+                        <option>Baru</option><option>Rusak Ringan</option><option>Rusak Berat</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-3">Stok & Harga</p>
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="form-label">Jumlah Stok Awal *</label>
+                      <input type="number" value={form.jumlah_stok_awal} onChange={(e) => setForm({ ...form, jumlah_stok_awal: +e.target.value })}
+                        className="form-input" min={0} />
+                    </div>
+                    <div>
+                      <label className="form-label">Kode Rak / Lokasi</label>
+                      <input value={form.kode_rak} onChange={(e) => setForm({ ...form, kode_rak: e.target.value })}
+                        placeholder="CONTOH: A1-01" className="form-input" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="form-label">Harga Beli (Rp) *</label>
+                      <input type="number" value={form.harga_beli} onChange={(e) => setForm({ ...form, harga_beli: +e.target.value })}
+                        placeholder="Rp 0" className="form-input" />
+                    </div>
+                    <div>
+                      <label className="form-label">Harga Jual (Rp) *</label>
+                      <input type="number" value={form.harga_jual} onChange={(e) => setForm({ ...form, harga_jual: +e.target.value })}
+                        placeholder="Rp 0" className="form-input" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="form-label">Tanggal Kadaluarsa <span className="text-gray-400">(Opsional)</span></label>
+                    <input type="date" value={form.tanggal_kadaluarsa} onChange={(e) => setForm({ ...form, tanggal_kadaluarsa: e.target.value })}
+                      className="form-input" />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100">
+              <button onClick={() => setShowAddModal(false)} className="btn-secondary">Batal</button>
+              <button onClick={handleSave} disabled={saving} className="btn-primary">
+                {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                Simpan Barang
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 modal-overlay">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl modal-content mx-4 p-6 text-center">
+            <div className="w-14 h-14 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle size={24} className="text-red-600" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Hapus Barang?</h3>
+            <p className="text-sm text-gray-500 mb-6">
+              Apakah Anda yakin ingin menghapus <strong>{showDeleteModal.name}</strong>?
+              Tindakan ini tidak dapat dibatalkan.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setShowDeleteModal(null)} className="btn-secondary flex-1 justify-center">Batal</button>
+              <button onClick={() => { toast.success("Barang dihapus"); setShowDeleteModal(null); }}
+                className="btn-danger flex-1 justify-center">Hapus</button>
             </div>
           </div>
         </div>

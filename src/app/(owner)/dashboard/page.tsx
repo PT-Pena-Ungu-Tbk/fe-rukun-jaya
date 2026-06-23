@@ -1,335 +1,288 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import TopNav from "@/components/layout/TopNav";
-import { useQuery } from "@tanstack/react-query";
-import { inventoryApi } from "@/lib/api";
-import { mockProducts } from "@/lib/mockData";
+import { TrendingUp, TrendingDown, FileText, Users, BarChart2, AlertTriangle, Clock, Printer, XCircle, LogIn, Package } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { formatRupiah } from "@/lib/utils";
-import StockBadge from "@/components/ui/StockBadge";
-import { getStockStatus } from "@/types";
-import {
-  Package,
-  Layers,
-  AlertTriangle,
-  Building,
-  Download,
-  Plus,
-  ChevronRight,
-  ChevronLeft,
-  Check,
-  Truck,
-  Boxes,
-  BarChart2,
-  RefreshCw,
-} from "lucide-react";
+import { dashboardApi } from "@/lib/api";
+import type { DashboardData } from "@/types";
 
-const WORKFLOW_STEPS = [
-  { label: "Supplier", icon: Truck },
-  { label: "Warehouse", icon: Boxes },
-  { label: "Inventory Setup", icon: Package, active: true },
-  { label: "Stock Validation", icon: Check },
-  { label: "Ready for Sales", icon: BarChart2 },
-];
+// ── Mock fallback ─────────────────────────────────────────────────────────────
+const mockData: DashboardData = {
+  summary: {
+    pendapatan_hari_ini: 24500000,
+    pendapatan_kemarin: 22600000,
+    persentase_perubahan_pendapatan: 8.4,
+    profit_kotor: 5200000,
+    profit_kemarin: 4990000,
+    persentase_perubahan_profit: 4.2,
+    volume_transaksi: 142,
+    volume_transaksi_kemarin: 144,
+    persentase_perubahan_volume: -1.2,
+    jumlah_pelanggan: 84,
+    jumlah_pelanggan_kemarin: 80,
+    persentase_perubahan_pelanggan: 5.0,
+  },
+  peringatan_stok: [
+    { sku: "SG-50-01", nama: "Semen Gresik 50kg", stok: 2, satuan: "Sak", status: "CRITICAL" },
+    { sku: "BB-10-SNI", nama: "Besi Beton 10mm SNI", stok: 16, satuan: "Btg", status: "LOW" },
+    { sku: "CT-DLX-W25", nama: "Cat Tembok Dulux Putih 25kg", stok: 0, satuan: "Klg", status: "EMPTY" },
+  ],
+  produk_terlaris: [
+    { nama: "Semen Tiga Roda", unit_terjual: 420, total_nilai: 21000000 },
+    { nama: "Besi Beton 10mm", unit_terjual: 315, total_nilai: 38000000 },
+    { nama: "Paku Payung", unit_terjual: 150, total_nilai: 3000000 },
+    { nama: "Triplek 9mm", unit_terjual: 88, total_nilai: 7000000 },
+    { nama: "Cat Avitex Putih", unit_terjual: 54, total_nilai: 12000000 },
+  ],
+  aktivitas_terbaru: [
+    { tipe: "INVOICE_PRINT", deskripsi: "Invoice #TRX-99824 dicetak", waktu: "" },
+    { tipe: "STOCK_UPDATE", deskripsi: "Update stok Cat Tembok", waktu: "" },
+    { tipe: "MEMBER_NEW", deskripsi: "Member VIP baru terdaftar", waktu: "" },
+    { tipe: "TRX_CANCEL", deskripsi: "Pembatalan nota #TRX-99810", waktu: "" },
+    { tipe: "LOGIN", deskripsi: "Kasir #2 mulai shift", waktu: "" },
+  ],
+  metode_pembayaran: {
+    tunai: { persentase: 45, total: 11025000 },
+    transfer_bank: { persentase: 40, total: 9800000 },
+    qris: { persentase: 15, total: 3675000 },
+    total_terproses: 24500000,
+  },
+  daily_sales_chart: [
+    { hari: "Mon", nilai: 11000000 },
+    { hari: "Tue", nilai: 18000000 },
+    { hari: "Wed", nilai: 15000000 },
+    { hari: "Thu", nilai: 25000000 },
+    { hari: "Fri", nilai: 21000000 },
+    { hari: "Sat", nilai: 30000000 },
+    { hari: "Sun", nilai: 27000000 },
+  ],
+};
 
-const RECENT_ACTIVITY = [
-  { type: "update", text: "SKU-C-001 Rack location updated", by: "Owner", time: "10 minutes ago" },
-  { type: "add", text: "Stock added: Cat Tembok Putih 25kg (50 pails)", by: "Warehouse Staff B", time: "2 hours ago" },
-  { type: "create", text: "New product category created: Roofing Materials", by: "Owner", time: "Yesterday at 14:30" },
-];
+const activityIconMap: Record<string, React.ElementType> = {
+  INVOICE_PRINT: Printer,
+  STOCK_UPDATE: BarChart2,
+  MEMBER_NEW: Users,
+  TRX_CANCEL: XCircle,
+  LOGIN: LogIn,
+};
+
+const colorMap: Record<string, string> = {
+  INVOICE_PRINT: "bg-blue-100 text-blue-600",
+  STOCK_UPDATE: "bg-green-100 text-green-600",
+  MEMBER_NEW: "bg-purple-100 text-purple-600",
+  TRX_CANCEL: "bg-red-100 text-red-600",
+  LOGIN: "bg-gray-100 text-gray-600",
+};
 
 export default function DashboardPage() {
-  const [search, setSearch] = useState("");
-  const [currentPage] = useState(1);
+  const [data, setData] = useState<DashboardData>(mockData);
+  const [loading, setLoading] = useState(true);
+  const today = new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["products", search],
-    queryFn: () => inventoryApi.getProducts({ search }),
-    // fall back to mock if API not available
-  });
+  useEffect(() => {
+    dashboardApi.getOverview()
+      .then(setData)
+      .catch(() => { /* keep mock data on error */ })
+      .finally(() => setLoading(false));
+  }, []);
 
-  const products = data?.data ?? mockProducts;
-  const filtered = search
-    ? products.filter(
-        (p) =>
-          p.name.toLowerCase().includes(search.toLowerCase()) ||
-          p.sku_code.toLowerCase().includes(search.toLowerCase())
-      )
-    : products;
+  const { summary, peringatan_stok, produk_terlaris, aktivitas_terbaru, metode_pembayaran, daily_sales_chart } = data;
 
-  const lowStockCount = products.filter(
-    (p) => p.current_stock <= p.min_stock
-  ).length;
-
-  const topSuppliers = [
-    { name: "PT Semen Indonesia", pct: 32 },
-    { name: "Krakatau Steel Dist.", pct: 28 },
+  const statCards = [
+    {
+      label: "Pendapatan Hari Ini",
+      value: formatRupiah(summary.pendapatan_hari_ini),
+      change: summary.persentase_perubahan_pendapatan,
+      icon: FileText,
+    },
+    {
+      label: "Profit Kotor",
+      value: formatRupiah(summary.profit_kotor),
+      change: summary.persentase_perubahan_profit,
+      icon: BarChart2,
+    },
+    {
+      label: "Volume Transaksi",
+      value: `${summary.volume_transaksi} Nota`,
+      change: summary.persentase_perubahan_volume,
+      icon: FileText,
+    },
+    {
+      label: "Jumlah Pelanggan",
+      value: `${summary.jumlah_pelanggan} Pelanggan`,
+      change: summary.persentase_perubahan_pelanggan,
+      icon: Users,
+    },
   ];
 
   return (
-    <div className="flex flex-col h-full">
-      <TopNav
-        title="Toko Bangunan Ci Ailing — Inventory & Warehouse Setup"
-        searchPlaceholder="Search SKU, Product..."
-        onSearch={setSearch}
-      />
-
-      <div className="flex-1 p-6 overflow-auto">
-        {/* Welcome Banner */}
-        <div className="relative bg-gradient-to-r from-blue-600 to-blue-800 rounded-xl p-6 mb-6 overflow-hidden">
-          <div className="relative z-10">
-            <h2 className="text-2xl font-bold text-white">Welcome back, Owner</h2>
-            <p className="text-blue-200 text-sm mt-1">Toko Bangunan Ci Ailing Dashboard</p>
+    <div className="flex-1 flex flex-col min-h-screen">
+      <TopNav />
+      <main className="flex-1 p-6 space-y-5 animate-fade-in">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Tinjauan Operasional</h1>
+            <p className="text-sm text-gray-500 mt-0.5">Ringkasan performa toko hari ini.</p>
           </div>
-          <button className="absolute right-6 top-1/2 -translate-y-1/2 flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 text-white text-sm font-medium rounded-lg transition-colors z-10">
-            <Download className="w-4 h-4" />
-            Export Report
-          </button>
-          <div className="absolute right-24 bottom-0 opacity-10">
-            <Boxes className="w-32 h-32 text-white" />
-          </div>
-        </div>
-
-        {/* Setup Workflow */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5 mb-6">
-          <p className="text-sm font-semibold text-slate-700 mb-4">Setup Workflow</p>
           <div className="flex items-center gap-2">
-            {WORKFLOW_STEPS.map((step, i) => (
-              <div key={step.label} className="flex items-center gap-2">
-                <div
-                  className={`flex flex-col items-center gap-1.5 ${
-                    step.active ? "text-blue-600" : "text-slate-400"
-                  }`}
-                >
-                  <div
-                    className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                      step.active ? "bg-blue-600 text-white" : "bg-slate-100"
-                    }`}
-                  >
-                    <step.icon className="w-5 h-5" />
-                  </div>
-                  <span className="text-xs font-medium">{step.label}</span>
-                </div>
-                {i < WORKFLOW_STEPS.length - 1 && (
-                  <div className="flex-1 h-px bg-slate-200 mx-1 mb-4" style={{ minWidth: 24 }} />
-                )}
-              </div>
-            ))}
+            {loading && (
+              <span className="text-xs text-blue-500 animate-pulse">Memuat data…</span>
+            )}
+            <span className="text-sm text-gray-500 bg-white border border-gray-200 px-3 py-1.5 rounded-lg shadow-sm">
+              {today}
+            </span>
           </div>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-4 gap-4 mb-6">
-          {[
-            { label: "Total Products", value: "1,240", icon: Package, color: "text-blue-600" },
-            { label: "Total Stock (Units)", value: "45,800", icon: Layers, color: "text-blue-600" },
-            { label: "Low Stock Alerts", value: lowStockCount.toString(), icon: AlertTriangle, color: "text-amber-600", highlight: true },
-            { label: "Active Suppliers", value: "24", icon: Building, color: "text-blue-600" },
-          ].map((s) => (
-            <div
-              key={s.label}
-              className={`bg-white rounded-xl border p-5 ${
-                s.highlight ? "border-amber-200 bg-amber-50" : "border-slate-200"
-              }`}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-xs font-medium text-slate-500">{s.label}</p>
-                <s.icon className={`w-4 h-4 ${s.highlight ? "text-amber-500" : s.color}`} />
+        {/* Stat Cards */}
+        <div className="grid grid-cols-4 gap-4 animate-slide-up">
+          {statCards.map((s, i) => (
+            <div key={i} className={`stat-card stagger-${i + 1}`}>
+              <div className="flex items-start justify-between mb-3">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">{s.label}</p>
+                <s.icon size={16} className="text-gray-400" />
               </div>
-              <p className={`text-2xl font-bold ${s.highlight ? "text-amber-700" : "text-slate-800"}`}>
-                {s.value}
-              </p>
+              <p className="text-2xl font-bold text-gray-900">{s.value}</p>
+              <div className={`flex items-center gap-1 mt-1.5 text-xs font-medium ${s.change >= 0 ? "text-green-600" : "text-red-500"}`}>
+                {s.change >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                {s.change > 0 ? "+" : ""}{s.change}% vs kemarin
+              </div>
             </div>
           ))}
         </div>
 
-        {/* Main Content */}
-        <div className="grid grid-cols-3 gap-5">
-          {/* Inventory Table */}
-          <div className="col-span-2 bg-white rounded-xl border border-slate-200">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-              <h3 className="font-semibold text-slate-800 text-sm">Inventory Management</h3>
-              <div className="flex gap-2">
-                <button className="text-slate-400 hover:text-slate-600 p-1">
-                  <RefreshCw className="w-4 h-4" />
-                </button>
-              </div>
+        {/* Chart + Stock Alerts */}
+        <div className="grid grid-cols-3 gap-4 animate-slide-up stagger-2">
+          {/* Chart */}
+          <div className="col-span-2 page-card p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold text-gray-800">Daily Sales Performance</h2>
+              <button className="text-gray-400 hover:text-gray-600"><BarChart2 size={16} /></button>
             </div>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Product Name</th>
-                  <th>SKU Code</th>
-                  <th>Rack</th>
-                  <th>Stock</th>
-                  <th>Min</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {isLoading ? (
-                  <tr>
-                    <td colSpan={6} className="text-center py-8 text-slate-400">
-                      Loading...
-                    </td>
-                  </tr>
-                ) : (
-                  filtered.slice(0, 5).map((p) => (
-                    <tr key={p.id}>
-                      <td className="text-blue-600 font-medium text-xs">{p.name}</td>
-                      <td className="text-xs text-slate-500">{p.sku_code}</td>
-                      <td className="text-xs text-slate-600">{p.rack_location}</td>
-                      <td className="text-xs font-semibold">{p.current_stock.toLocaleString()}</td>
-                      <td className="text-xs text-slate-500">{p.min_stock}</td>
-                      <td>
-                        <StockBadge product={p} />
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-            <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100">
-              <p className="text-xs text-slate-400">Showing 1-5 of 1,240 items</p>
-              <div className="flex gap-1">
-                <button className="p-1 hover:bg-slate-100 rounded">
-                  <ChevronLeft className="w-4 h-4 text-slate-400" />
-                </button>
-                <button className="p-1 hover:bg-slate-100 rounded">
-                  <ChevronRight className="w-4 h-4 text-slate-400" />
-                </button>
-              </div>
-            </div>
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={daily_sales_chart}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#F0F0F0" />
+                <XAxis dataKey="hari" tick={{ fontSize: 11, fill: "#9CA3AF" }} />
+                <YAxis tick={{ fontSize: 11, fill: "#9CA3AF" }} tickFormatter={(v) => `${v / 1000000}jt`} />
+                <Tooltip formatter={(v: number) => formatRupiah(v)} labelStyle={{ fontSize: 12 }} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+                <Line type="monotone" dataKey="nilai" stroke="#3B82F6" strokeWidth={2.5} dot={{ r: 4, fill: "#3B82F6" }} activeDot={{ r: 6 }} />
+              </LineChart>
+            </ResponsiveContainer>
           </div>
 
-          {/* Right Column */}
-          <div className="space-y-5">
-            {/* Quick Add */}
-            <div className="bg-white rounded-xl border border-slate-200 p-5">
-              <div className="flex items-center gap-2 mb-4">
-                <Package className="w-4 h-4 text-blue-600" />
-                <h3 className="text-sm font-semibold text-slate-800">Quick Add Product</h3>
-              </div>
-              <div className="space-y-3">
-                <input placeholder="Product Name" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400" />
-                <div className="grid grid-cols-2 gap-2">
-                  <select className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 text-slate-400">
-                    <option value="">Select...</option>
-                    <option>Cement & Sand</option>
-                    <option>Steel</option>
-                    <option>Hardware</option>
-                    <option>Paints</option>
-                    <option>Timber</option>
-                    <option>Pipes & Fittings</option>
-                  </select>
-                  <input placeholder="Rack Code" className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400" />
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <input placeholder="Initial Stock" type="number" className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400" />
-                  <input placeholder="Min Threshold" type="number" className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400" />
-                </div>
-                <input placeholder="Base Price (Rp)" type="number" className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400" />
-                <button className="w-full py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2">
-                  <Plus className="w-4 h-4" />
-                  Save Product
-                </button>
-              </div>
+          {/* Stock Alerts */}
+          <div className="page-card p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <AlertTriangle size={16} className="text-amber-500" />
+              <h2 className="font-semibold text-gray-800">Peringatan Stok Tipis</h2>
             </div>
-
-            {/* Action Required */}
-            <div className="bg-white rounded-xl border border-amber-200 p-5">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-500" />
-                  <h3 className="text-sm font-semibold text-slate-800">Action Required</h3>
-                </div>
-                <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-semibold rounded-full">
-                  12 Items
-                </span>
-              </div>
-              {products
-                .filter((p) => getStockStatus(p) !== "In Stock")
-                .slice(0, 3)
-                .map((p) => (
-                  <div key={p.id} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
-                    <div>
-                      <p className="text-xs font-medium text-slate-700">{p.name}</p>
-                      <p className="text-[11px] text-slate-400">{p.rack_location}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs font-bold text-red-600">{p.current_stock} units</p>
-                      <p className="text-[11px] text-slate-400">Min: {p.min_stock}</p>
-                    </div>
-                  </div>
-                ))}
-              <button className="w-full mt-3 text-xs text-blue-600 hover:underline">
-                View all alerts
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Recent Activity + Logistics */}
-        <div className="grid grid-cols-2 gap-5 mt-5">
-          {/* Recent Activity */}
-          <div className="bg-white rounded-xl border border-slate-200 p-5">
-            <h3 className="text-sm font-semibold text-slate-800 mb-4">Recent Setup Activity</h3>
             <div className="space-y-3">
-              {RECENT_ACTIVITY.map((a, i) => (
-                <div key={i} className="flex gap-3">
-                  <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${
-                    a.type === "add" ? "bg-green-100" : a.type === "create" ? "bg-blue-100" : "bg-slate-100"
-                  }`}>
-                    {a.type === "add" ? <Plus className="w-3.5 h-3.5 text-green-600" /> :
-                     a.type === "create" ? <Package className="w-3.5 h-3.5 text-blue-600" /> :
-                     <RefreshCw className="w-3.5 h-3.5 text-slate-500" />}
-                  </div>
+              {peringatan_stok.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-4">Semua stok aman</p>
+              ) : peringatan_stok.map((s) => (
+                <div key={s.sku} className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs font-medium text-slate-700">{a.text}</p>
-                    <p className="text-[11px] text-slate-400">By {a.by} • {a.time}</p>
+                    <p className="text-sm font-medium text-gray-800 leading-tight">{s.nama}</p>
+                    <p className="text-xs text-gray-400">SKU: {s.sku}</p>
                   </div>
+                  <span className={`text-xs font-bold px-2 py-1 rounded-md ${
+                    s.status === "EMPTY" ? "bg-red-100 text-red-700" :
+                    s.status === "CRITICAL" ? "bg-orange-100 text-orange-700" :
+                    "bg-amber-100 text-amber-700"
+                  }`}>
+                    {s.status === "EMPTY" ? "Habis!" : `Sisa ${s.stok} ${s.satuan}`}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom row */}
+        <div className="grid grid-cols-3 gap-4 animate-slide-up stagger-3">
+          {/* Top Products */}
+          <div className="page-card p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold text-gray-800">Produk Terlaris</h2>
+              <Package size={15} className="text-gray-400" />
+            </div>
+            <div className="space-y-3">
+              {produk_terlaris.map((p) => (
+                <div key={p.nama} className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">{p.nama}</p>
+                    <p className="text-xs text-gray-400">{p.unit_terjual} Unit Terjual</p>
+                  </div>
+                  <span className="text-sm font-semibold text-gray-700">
+                    {formatRupiah(p.total_nilai)}
+                  </span>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Logistics Overview */}
-          <div className="bg-white rounded-xl border border-slate-200 p-5">
-            <h3 className="text-sm font-semibold text-slate-800 mb-4">Logistics Overview</h3>
-            <div className="mb-4">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
-                Top Suppliers
-              </p>
-              {topSuppliers.map((s) => (
-                <div key={s.name} className="mb-2">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-slate-600">{s.name}</span>
-                    <span className="text-xs font-semibold text-slate-700">{s.pct}%</span>
-                  </div>
-                  <div className="w-full h-1.5 bg-slate-100 rounded-full">
-                    <div
-                      className="h-1.5 bg-blue-500 rounded-full"
-                      style={{ width: `${s.pct}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
+          {/* Activities */}
+          <div className="page-card p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold text-gray-800">Aktivitas Terbaru</h2>
+              <Clock size={15} className="text-gray-400" />
             </div>
-            <div>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
-                Warehouse Capacity
-              </p>
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs text-slate-600">Zone A (Heavy Materials) near max capacity.</span>
-                <span className="text-xs font-semibold text-amber-600">75%</span>
+            <div className="space-y-3">
+              {aktivitas_terbaru.map((a, i) => {
+                const Icon = activityIconMap[a.tipe] ?? FileText;
+                const cls = colorMap[a.tipe] ?? "bg-gray-100 text-gray-600";
+                return (
+                  <div key={i} className="flex items-start gap-3">
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${cls}`}>
+                      <Icon size={13} />
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-700 leading-tight">{a.deskripsi}</p>
+                      {a.waktu && (
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {new Date(a.waktu).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Payment Methods */}
+          <div className="page-card p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold text-gray-800">Metode Pembayaran</h2>
+              <FileText size={15} className="text-gray-400" />
+            </div>
+            {[
+              { label: "Tunai", pct: metode_pembayaran.tunai.persentase, color: "bg-blue-600" },
+              { label: "Transfer Bank", pct: metode_pembayaran.transfer_bank.persentase, color: "bg-gray-400" },
+              { label: "QRIS / E-Wallet", pct: metode_pembayaran.qris.persentase, color: "bg-amber-400" },
+            ].map((m) => (
+              <div key={m.label} className="mb-3">
+                <div className="flex justify-between text-xs text-gray-600 mb-1">
+                  <span>{m.label}</span>
+                  <span className="font-semibold">{m.pct}%</span>
+                </div>
+                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div className={`h-full ${m.color} rounded-full transition-all duration-500`} style={{ width: `${m.pct}%` }} />
+                </div>
               </div>
-              <div className="w-full h-2 bg-slate-100 rounded-full">
-                <div className="h-2 bg-amber-400 rounded-full" style={{ width: "75%" }} />
+            ))}
+            <div className="mt-4 pt-3 border-t border-gray-100">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Total Terproses:</span>
+                <span className="font-bold text-gray-900">{formatRupiah(metode_pembayaran.total_terproses)}</span>
               </div>
             </div>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

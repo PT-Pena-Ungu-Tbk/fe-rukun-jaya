@@ -2,256 +2,140 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Eye, EyeOff, User, Lock, Building2 } from "lucide-react";
-import { authApi } from "@/lib/api";
+import { Eye, EyeOff, User, Lock, ArrowRight, Loader2 } from "lucide-react";
 import { saveAuth } from "@/lib/auth";
 import toast from "react-hot-toast";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [tab, setTab] = useState<"signin" | "create">("signin");
-  const [form, setForm] = useState({ email: "", password: "" });
+  const [emailOrUsername, setEmailOrUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-    setError("");
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!emailOrUsername || !password) {
+      toast.error("Email/username dan password wajib diisi");
+      return;
+    }
     setLoading(true);
-    setError("");
     try {
-      const res = await authApi.login(form);
-      saveAuth(res.data.token, res.data.user);
-      toast.success(`Selamat datang, ${res.data.user.name}!`);
-      if (res.data.user.role === "CASHIER") {
-        router.push("/pos");
-      } else {
-        router.push("/dashboard");
-      }
-    } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        "Email atau password salah.";
-      setError(msg);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "https://be-rukun-jaya-production.up.railway.app/api/v1"}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: emailOrUsername, password }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message ?? json.error ?? "Login gagal");
+      // Real API response: { data: { access_token, user: { id, name/nama_lengkap, email, role } } }
+      const payload = json.data ?? json;
+      const token = payload.access_token ?? payload.token;
+      const user = payload.user ?? {};
+      const displayName = user.name ?? user.nama_lengkap ?? user.email ?? "User";
+      const role = user.role ?? "CASHIER";
+      saveAuth(token, { id: user.id ?? "0", name: displayName, email: user.email ?? emailOrUsername, role });
+      toast.success(`Selamat datang, ${displayName}!`);
+      router.push(role === "OWNER" ? "/dashboard" : "/pos");
+    } catch {
+      toast.error("Email/username atau password salah");
     } finally {
       setLoading(false);
     }
   };
 
-  const loginAsDemo = async (role: "owner" | "cashier") => {
-    setLoading(true);
-    const credentials = {
-      owner: { email: "owner@toko-rukunjaya.com", password: "password_rahasia" },
-      cashier: { email: "cashier@toko-rukunjaya.com", password: "password_rahasia" },
-    };
-    try {
-      const res = await authApi.login(credentials[role]);
-      saveAuth(res.data.token, res.data.user);
-      toast.success(`Login sebagai ${role === "owner" ? "Owner" : "Kasir"}`);
-      router.push(role === "owner" ? "/dashboard" : "/pos");
-    } catch {
-      // fallback mock for demo
-      const mockUser = {
-        id: "mock-id",
-        name: role === "owner" ? "Owner Demo" : "Cashier Demo",
-        email: credentials[role].email,
-        role: role === "owner" ? ("OWNER" as const) : ("CASHIER" as const),
-      };
-      saveAuth("mock-token", mockUser);
-      router.push(role === "owner" ? "/dashboard" : "/pos");
-    } finally {
-      setLoading(false);
-    }
+  const demoLogin = (role: "OWNER" | "CASHIER") => {
+    const mockUser = role === "OWNER"
+      ? { id: "STF001", name: "Andi Wijaya", email: "owner@rukunajaya.id", role: "OWNER" as const }
+      : { id: "STF002", name: "Siti Aminah", email: "kasir@rukunajaya.id", role: "CASHIER" as const };
+    saveAuth("demo-token-" + role, mockUser);
+    toast.success(`Demo login sebagai ${role === "OWNER" ? "Owner" : "Kasir"}`);
+    router.push(role === "OWNER" ? "/dashboard" : "/pos");
   };
 
   return (
     <div className="min-h-screen flex">
-      {/* Left panel */}
-      <div className="w-5/12 bg-blue-600 flex flex-col justify-between p-10 text-white">
+      {/* Left Panel */}
+      <div className="w-[40%] bg-blue-600 flex flex-col justify-between p-10 animate-fade-in">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center">
-            <Building2 className="w-7 h-7 text-blue-600" />
+          <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-md">
+            <span className="text-blue-600 font-extrabold text-lg">RJ</span>
           </div>
-          <div>
-            <p className="text-xl font-bold">Toko Bangunan</p>
-            <p className="text-xl font-bold">Ci Ailing</p>
-          </div>
+          <span className="text-white font-bold text-xl">Toko Rukun Jaya</span>
         </div>
-        <div>
-          <h2 className="text-3xl font-bold leading-tight mb-4">
-            Enterprise Inventory &amp; POS Management System
+
+        <div className="animate-slide-up stagger-2">
+          <h2 className="text-white font-bold text-2xl leading-snug mb-3">
+            Enterprise Inventory &<br />POS Management System
           </h2>
           <p className="text-blue-200 text-sm leading-relaxed">
-            Streamline your warehouse operations, track materials with precision, and manage retail
-            sales from a single, robust platform designed for building supply enterprises.
+            Streamline your warehouse operations, track materials with
+            precision, and manage retail sales from a single, robust
+            platform designed for building supply enterprises.
           </p>
         </div>
-        <p className="text-blue-300 text-xs">
-          © 2024 TimberFlow ERP Systems. All rights reserved.
-        </p>
+        <div />
       </div>
 
-      {/* Right panel */}
-      <div className="flex-1 bg-white flex items-center justify-center p-8">
-        <div className="w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-lg p-8">
-          {/* Tabs */}
-          <div className="flex border-b border-slate-200 mb-6">
-            <button
-              onClick={() => setTab("signin")}
-              className={`flex-1 pb-3 text-sm font-medium transition-colors ${
-                tab === "signin"
-                  ? "text-blue-600 border-b-2 border-blue-600"
-                  : "text-slate-400 hover:text-slate-600"
-              }`}
-            >
-              Sign In
-            </button>
-            <button
-              onClick={() => setTab("create")}
-              className={`flex-1 pb-3 text-sm font-medium transition-colors ${
-                tab === "create"
-                  ? "text-blue-600 border-b-2 border-blue-600"
-                  : "text-slate-400 hover:text-slate-600"
-              }`}
-            >
-              Create Account
-            </button>
-          </div>
+      {/* Right Panel */}
+      <div className="flex-1 bg-white flex items-center justify-center px-10">
+        <div className="w-full max-w-sm animate-scale-in">
+          <div className="border border-gray-200 rounded-2xl p-8 shadow-sm">
+            <h3 className="text-xl font-bold text-gray-900 mb-1">Welcome back</h3>
+            <p className="text-sm text-gray-500 mb-6">Please enter your credentials to access the system.</p>
 
-          {tab === "signin" ? (
-            <>
-              <div className="mb-6">
-                <h3 className="text-xl font-bold text-slate-800">Welcome back</h3>
-                <p className="text-sm text-slate-500 mt-1">
-                  Please enter your credentials to access the system.
-                </p>
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div>
+                <label className="form-label">Email or Username</label>
+                <div className="relative">
+                  <User size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    value={emailOrUsername}
+                    onChange={(e) => setEmailOrUsername(e.target.value)}
+                    placeholder="admin@ciailing.com"
+                    className="form-input pl-9"
+                  />
+                </div>
               </div>
 
-              {error && (
-                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
-                  {error}
-                </div>
-              )}
-
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {/* Email */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                    Email or Username
-                  </label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <input
-                      type="email"
-                      name="email"
-                      value={form.email}
-                      onChange={handleChange}
-                      placeholder="admin@ciailing.com"
-                      required
-                      className="w-full pl-10 pr-4 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                </div>
-
-                {/* Password */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                    Password
-                  </label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      name="password"
-                      value={form.password}
-                      onChange={handleChange}
-                      placeholder="••••••••"
-                      required
-                      className="w-full pl-10 pr-10 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <label className="flex items-center gap-2 text-sm text-slate-600">
-                    <input type="checkbox" className="rounded border-slate-300" />
-                    Remember me
-                  </label>
-                  <button type="button" className="text-sm text-blue-600 hover:underline">
-                    Forgot Password?
+              <div>
+                <label className="form-label">Password</label>
+                <div className="relative">
+                  <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="form-input pl-9 pr-10"
+                  />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                    {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                   </button>
                 </div>
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
-                >
-                  {loading ? (
-                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                  ) : null}
-                  Sign In →
-                </button>
-              </form>
-
-              {/* Divider */}
-              <div className="my-5 flex items-center gap-3">
-                <div className="flex-1 h-px bg-slate-200" />
-                <span className="text-xs text-slate-400">Or quick login for demo</span>
-                <div className="flex-1 h-px bg-slate-200" />
               </div>
 
-              {/* Demo buttons */}
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => loginAsDemo("owner")}
-                  disabled={loading}
-                  className="py-2.5 border border-slate-300 text-sm font-medium text-slate-700 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
-                >
-                  <Building2 className="w-4 h-4" />
-                  Login as Owner
+              <button type="submit" disabled={loading} className="btn-primary w-full justify-center py-2.5 mt-2">
+                {loading ? <Loader2 size={16} className="animate-spin" /> : <>Sign In <ArrowRight size={15} /></>}
+              </button>
+            </form>
+
+            <div className="mt-5 pt-4 border-t border-gray-100">
+              <p className="text-xs text-gray-400 text-center mb-3">Demo login</p>
+              <div className="flex gap-2">
+                <button onClick={() => demoLogin("OWNER")}
+                  className="flex-1 py-2 text-xs font-medium border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors">
+                  Owner
                 </button>
-                <button
-                  onClick={() => loginAsDemo("cashier")}
-                  disabled={loading}
-                  className="py-2.5 border border-slate-300 text-sm font-medium text-slate-700 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
-                >
-                  <User className="w-4 h-4" />
-                  Login as Cashier
+                <button onClick={() => demoLogin("CASHIER")}
+                  className="flex-1 py-2 text-xs font-medium border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors">
+                  Kasir
                 </button>
               </div>
-
-              <p className="text-center text-xs text-slate-400 mt-5">
-                Need help accessing your account?{" "}
-                <a href="#" className="text-blue-600 hover:underline">
-                  Contact System Admin
-                </a>
-              </p>
-            </>
-          ) : (
-            <div className="text-center py-8">
-              <p className="text-slate-500 text-sm">
-                Pembuatan akun dilakukan oleh System Admin.
-                <br />
-                Hubungi admin untuk mendapatkan akses.
-              </p>
             </div>
-          )}
+          </div>
         </div>
       </div>
     </div>

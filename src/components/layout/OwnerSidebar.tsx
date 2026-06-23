@@ -1,95 +1,67 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
-  Package,
-  Warehouse,
-  Truck,
-  AlertTriangle,
-  BarChart2,
-  Users,
-  Settings,
-  LogOut,
-  Building2,
+  ShoppingCart,
+  Archive,
+  ShieldCheck,
+  UserCog,
+  Star,
+  ClipboardList,
+  BarChart3,
+  ShieldAlert,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { clearAuth, getUser } from "@/lib/auth";
 
 const navItems = [
-  { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-  { href: "/inventory", icon: Package, label: "Inventory Management" },
-  { href: "/warehouse", icon: Warehouse, label: "Warehouse Stock" },
-  { href: "/supplier", icon: Truck, label: "Supplier" },
-  { href: "/stock-alerts", icon: AlertTriangle, label: "Stock Alerts" },
-  { href: "/financial-reports", icon: BarChart2, label: "Financial Reports" },
-  { href: "/user-management", icon: Users, label: "User Management" },
+  { href: "/dashboard",           label: "Dasbor",             icon: LayoutDashboard },
+  { href: "/pos",                  label: "Penjualan",           icon: ShoppingCart },
+  { href: "/inventory",            label: "Inventaris",          icon: Archive },
+  { href: "/warranty",             label: "Garansi",             icon: ShieldCheck },
+  { href: "/user-management",      label: "Pengaturan Akses",    icon: UserCog },
+  { href: "/members",              label: "Member VIP",          icon: Star },
+  { href: "/transaction-history",  label: "Riwayat Transaksi",   icon: ClipboardList },
+  { href: "/financial-reports",    label: "Laporan Keuangan",    icon: BarChart3 },
+  { href: "/audit-log",            label: "Audit Log",           icon: ShieldAlert },
 ];
 
 export default function OwnerSidebar() {
   const pathname = usePathname();
-  const router = useRouter();
-  const user = getUser();
 
-  const handleLogout = () => {
-    clearAuth();
-    router.push("/login");
-  };
+  const isActive = (href: string) =>
+    pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
 
   return (
-    <aside className="flex flex-col w-56 min-h-screen bg-[#1E3A5F] text-white">
+    <aside className="w-56 min-h-screen bg-white border-r border-gray-200 flex flex-col animate-slide-left">
       {/* Logo */}
-      <div className="px-4 py-5 border-b border-white/10">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-white rounded-lg flex items-center justify-center">
-            <Building2 className="w-5 h-5 text-blue-700" />
-          </div>
-          <div>
-            <p className="text-sm font-bold leading-tight">Toko Rukun Jaya</p>
-            <p className="text-[10px] text-slate-400">Enterprise Inventory</p>
-          </div>
+      <div className="flex items-center gap-3 px-5 py-5 border-b border-gray-100">
+        <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center shadow-sm flex-shrink-0">
+          <span className="text-white font-bold text-sm">RJ</span>
+        </div>
+        <div>
+          <p className="text-sm font-bold text-gray-900 leading-tight">Toko Rukun Jaya</p>
+          <p className="text-[10px] text-gray-400">Enterprise POS</p>
         </div>
       </div>
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-0.5">
-        {navItems.map(({ href, icon: Icon, label }) => {
-          const isActive = pathname === href || pathname.startsWith(href + "/");
-          return (
-            <Link
-              key={href}
-              href={href}
-              className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-all",
-                isActive
-                  ? "bg-blue-600 text-white"
-                  : "text-slate-300 hover:bg-white/10 hover:text-white"
-              )}
-            >
-              <Icon className="w-4 h-4 flex-shrink-0" />
-              {label}
-            </Link>
-          );
-        })}
+        {navItems.map(({ href, label, icon: Icon }) => (
+          <Link
+            key={href}
+            href={href}
+            className={isActive(href) ? "sidebar-item-active" : "sidebar-item"}
+          >
+            <Icon size={17} className="flex-shrink-0" />
+            <span>{label}</span>
+          </Link>
+        ))}
       </nav>
 
-      {/* Bottom */}
-      <div className="px-3 pb-4 space-y-0.5 border-t border-white/10 pt-3">
-        <Link
-          href="/settings"
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium text-slate-300 hover:bg-white/10 hover:text-white transition-all"
-        >
-          <Settings className="w-4 h-4" />
-          Settings
-        </Link>
-        <button
-          onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium text-slate-300 hover:bg-white/10 hover:text-white transition-all"
-        >
-          <LogOut className="w-4 h-4" />
-          Logout
-        </button>
+      {/* Footer */}
+      <div className="px-4 py-4 border-t border-gray-100">
+        <p className="text-[10px] text-gray-400 text-center">v1.0.0 · Rukun Jaya POS</p>
       </div>
     </aside>
   );
