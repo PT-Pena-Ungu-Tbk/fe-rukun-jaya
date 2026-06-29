@@ -89,59 +89,79 @@ export default function DashboardPage() {
         const d = (payload.data ?? res) as Record<string, unknown>;
         if (!d || typeof d !== "object") return;
 
-        setData((prev) => {
-          const stockArr = (d.low_stock_products ?? d.peringatan_stok) as unknown[] | undefined;
-          const topArr   = (d.top_products       ?? d.produk_terlaris)  as unknown[] | undefined;
-          const actArr   = (d.recent_activities  ?? d.aktivitas_terbaru) as unknown[] | undefined;
+        // API mengembalikan data nested: d.summary, d.produk_terlaris, dll.
+        const s   = (d.summary ?? {}) as Record<string, unknown>;
+        const stockArr = d.peringatan_stok as unknown[] | undefined;
+        const topArr   = d.produk_terlaris as unknown[] | undefined;
+        const actArr   = d.aktivitas_terbaru as unknown[] | undefined;
+        const chart    = d.daily_sales_chart as unknown[] | undefined;
+        const pm       = (d.metode_pembayaran ?? {}) as Record<string, unknown>;
+        const tunai    = (pm.tunai ?? {}) as Record<string, unknown>;
+        const transfer = (pm.transfer_bank ?? {}) as Record<string, unknown>;
+        const qris     = (pm.qris ?? {}) as Record<string, unknown>;
 
-          return {
-            ...prev,
-            summary: {
-              ...prev.summary,
-              pendapatan_hari_ini: Number(d.total_revenue ?? d.pendapatan_hari_ini ?? prev.summary.pendapatan_hari_ini),
-              volume_transaksi:    Number(d.total_transactions ?? d.volume_transaksi ?? prev.summary.volume_transaksi),
-              jumlah_pelanggan:    Number(d.total_customers ?? d.jumlah_pelanggan ?? prev.summary.jumlah_pelanggan),
-              profit_kotor:        Number(d.total_profit ?? d.profit_kotor ?? prev.summary.profit_kotor),
-              persentase_perubahan_pendapatan: Number(d.revenue_change ?? prev.summary.persentase_perubahan_pendapatan),
-              persentase_perubahan_volume:    Number(d.transactions_change ?? prev.summary.persentase_perubahan_volume),
-              persentase_perubahan_pelanggan: Number(d.customers_change ?? prev.summary.persentase_perubahan_pelanggan),
-              persentase_perubahan_profit:    Number(d.profit_change ?? prev.summary.persentase_perubahan_profit),
-            },
-            peringatan_stok: Array.isArray(stockArr)
-              ? stockArr.map((s) => {
-                  const item = s as Record<string, unknown>;
-                  const stok = Number(item.current_stock ?? item.stok ?? 0);
-                  return {
-                    sku: String(item.sku_code ?? item.sku ?? ""),
-                    nama: String(item.name ?? item.nama ?? ""),
-                    stok,
-                    satuan: String(item.unit ?? item.satuan ?? "pcs"),
-                    status: (stok === 0 ? "EMPTY" : stok <= 5 ? "CRITICAL" : "LOW") as "EMPTY" | "CRITICAL" | "LOW",
-                  };
-                })
-              : prev.peringatan_stok,
-            produk_terlaris: Array.isArray(topArr)
-              ? topArr.map((p) => {
-                  const item = p as Record<string, unknown>;
-                  return {
-                    nama: String(item.name ?? item.nama ?? ""),
-                    unit_terjual: Number(item.quantity_sold ?? item.unit_terjual ?? 0),
-                    total_nilai:  Number(item.revenue ?? item.total_nilai ?? 0),
-                  };
-                })
-              : prev.produk_terlaris,
-            aktivitas_terbaru: Array.isArray(actArr)
-              ? actArr.map((a) => {
-                  const item = a as Record<string, unknown>;
-                  return {
-                    tipe: String(item.type ?? item.tipe ?? "LOGIN"),
-                    deskripsi: String(item.description ?? item.deskripsi ?? ""),
-                    waktu: String(item.created_at ?? item.waktu ?? ""),
-                  };
-                })
-              : prev.aktivitas_terbaru,
-          };
-        });
+        setData((prev) => ({
+          ...prev,
+          summary: {
+            pendapatan_hari_ini:              Number(s.pendapatan_hari_ini ?? prev.summary.pendapatan_hari_ini),
+            pendapatan_kemarin:               Number(s.pendapatan_kemarin ?? 0),
+            persentase_perubahan_pendapatan:  Number(s.persentase_perubahan_pendapatan ?? prev.summary.persentase_perubahan_pendapatan),
+            profit_kotor:                     Number(s.profit_kotor ?? prev.summary.profit_kotor),
+            profit_kemarin:                   Number(s.profit_kemarin ?? 0),
+            persentase_perubahan_profit:      Number(s.persentase_perubahan_profit ?? prev.summary.persentase_perubahan_profit),
+            volume_transaksi:                 Number(s.volume_transaksi ?? prev.summary.volume_transaksi),
+            volume_transaksi_kemarin:         Number(s.volume_transaksi_kemarin ?? 0),
+            persentase_perubahan_volume:      Number(s.persentase_perubahan_volume ?? prev.summary.persentase_perubahan_volume),
+            jumlah_pelanggan:                 Number(s.jumlah_pelanggan ?? prev.summary.jumlah_pelanggan),
+            jumlah_pelanggan_kemarin:         Number(s.jumlah_pelanggan_kemarin ?? 0),
+            persentase_perubahan_pelanggan:   Number(s.persentase_perubahan_pelanggan ?? prev.summary.persentase_perubahan_pelanggan),
+          },
+          peringatan_stok: Array.isArray(stockArr) && stockArr.length > 0
+            ? stockArr.map((item) => {
+                const i = item as Record<string, unknown>;
+                const stok = Number(i.stok ?? i.current_stock ?? 0);
+                return {
+                  sku: String(i.sku ?? i.sku_code ?? ""),
+                  nama: String(i.nama ?? i.name ?? ""),
+                  stok,
+                  satuan: String(i.satuan ?? i.unit ?? "pcs"),
+                  status: (stok === 0 ? "EMPTY" : stok <= 5 ? "CRITICAL" : "LOW") as "EMPTY" | "CRITICAL" | "LOW",
+                };
+              })
+            : prev.peringatan_stok,
+          produk_terlaris: Array.isArray(topArr) && topArr.length > 0
+            ? topArr.map((item) => {
+                const i = item as Record<string, unknown>;
+                return {
+                  nama:         String(i.nama ?? i.name ?? ""),
+                  unit_terjual: Number(i.unit_terjual ?? i.quantity_sold ?? 0),
+                  total_nilai:  Number(i.total_nilai ?? i.revenue ?? 0),
+                };
+              })
+            : prev.produk_terlaris,
+          aktivitas_terbaru: Array.isArray(actArr) && actArr.length > 0
+            ? actArr.map((item) => {
+                const i = item as Record<string, unknown>;
+                return {
+                  tipe:      String(i.tipe ?? i.type ?? "LOGIN"),
+                  deskripsi: String(i.deskripsi ?? i.description ?? ""),
+                  waktu:     String(i.waktu ?? i.created_at ?? ""),
+                };
+              })
+            : prev.aktivitas_terbaru,
+          metode_pembayaran: pm.total_terproses !== undefined ? {
+            tunai:        { persentase: Number(tunai.persentase ?? 0),    total: Number(tunai.total ?? 0) },
+            transfer_bank:{ persentase: Number(transfer.persentase ?? 0), total: Number(transfer.total ?? 0) },
+            qris:         { persentase: Number(qris.persentase ?? 0),     total: Number(qris.total ?? 0) },
+            total_terproses: Number(pm.total_terproses ?? 0),
+          } : prev.metode_pembayaran,
+          daily_sales_chart: Array.isArray(chart) && chart.length > 0
+            ? chart.map((item) => {
+                const i = item as Record<string, unknown>;
+                return { hari: String(i.hari ?? ""), nilai: Number(i.nilai ?? 0) };
+              })
+            : prev.daily_sales_chart,
+        }));
       })
       .catch(() => { /* keep mock data on error */ })
       .finally(() => setLoading(false));

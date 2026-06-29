@@ -126,11 +126,11 @@ export const posApi = {
     items: { product_id: string; qty: number }[];
     payment_method: "CASH" | "QRIS" | "DEBIT" | "TRANSFER";
     jumlah_bayar: number;
-    vip_phone?: string;
-    diskon_persen?: number;
-    diskon_nominal?: number;
-    nama_pelanggan?: string;
-    payment_reference?: string;
+    vip_phone: string;
+    diskon_persen: number;
+    diskon_nominal: number;
+    nama_pelanggan: string;
+    payment_reference: string;
   }) =>
     apiClient.post("/pos/transactions", data).then((r) => r.data),
 
@@ -145,6 +145,10 @@ export const financeApi = {
   /** GET /finance/summary?period=&date_from=&date_to= */
   getSummary: (params: { period?: string; date_from?: string; date_to?: string }) =>
     apiClient.get("/finance/summary", { params }).then((r) => r.data),
+
+  /** GET /finance/export?date_from=&date_to= → application/pdf */
+  exportPdf: (params: { date_from: string; date_to: string }) =>
+    apiClient.get("/finance/export", { params, responseType: "blob" }).then((r) => r.data as Blob),
 };
 
 // ─── DASHBOARD ───────────────────────────────────────────────────────────────

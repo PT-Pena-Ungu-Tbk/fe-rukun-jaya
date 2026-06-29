@@ -27,6 +27,7 @@ const levelBadge = (l: string) => {
 
 export default function MembersPage() {
   const [members, setMembers] = useState<Member[]>(MOCK_MEMBERS);
+  const [apiStats, setApiStats] = useState<{ total_members: number; active_members: number; total_poin_issued: number } | null>(null);
   const [search, setSearch] = useState("");
   const [filterLevel, setFilterLevel] = useState("All Levels");
   const [showAddModal, setShowAddModal] = useState(false);
@@ -34,22 +35,30 @@ export default function MembersPage() {
   const [form, setForm] = useState({ nama: "", phone_number: "", level: "Bronze", poin_awal: 0 });
   const [saving, setSaving] = useState(false);
 
+  const mapMembers = (list: Record<string, unknown>[]) => list.map((m, i) => ({
+    member_id: String(m.member_id ?? m.id ?? `#VIP-${i}`),
+    nama: String(m.nama ?? m.name ?? ""),
+    phone_number: String(m.phone_number ?? ""),
+    level: String(m.level ?? "Bronze") as "Gold" | "Silver" | "Bronze",
+    poin: Number(m.poin ?? m.points ?? 0),
+    join_date: String(m.join_date ?? m.created_at ?? "").split("T")[0],
+    last_transaction: m.last_transaction ? String(m.last_transaction) : "-",
+  }));
+
   useEffect(() => {
     membersApi.getList()
       .then((res) => {
         const payload = res as Record<string, unknown>;
-        const list = Array.isArray(payload.data) ? payload.data : Array.isArray(res) ? res : [];
-        if (list.length > 0) {
-          const mapped = list.map((m: Record<string, unknown>, i: number) => ({
-            member_id: String(m.id ?? m.member_id ?? `#VIP-${i}`),
-            nama: String(m.name ?? m.nama ?? ""),
-            phone_number: String(m.phone_number ?? ""),
-            level: (String(m.level ?? m.tier ?? "Bronze")) as "Gold" | "Silver" | "Bronze",
-            poin: Number(m.points ?? m.poin ?? 0),
-            join_date: String(m.created_at ?? m.join_date ?? "").split("T")[0],
-            last_transaction: String(m.last_transaction ?? "-"),
-          }));
-          setMembers(mapped);
+        const d = (payload.data ?? {}) as Record<string, unknown>;
+        const items = Array.isArray(d.items) ? d.items as Record<string, unknown>[] : [];
+        const stats = (d.stats ?? {}) as Record<string, unknown>;
+        if (items.length > 0) setMembers(mapMembers(items));
+        if (stats.total_members !== undefined) {
+          setApiStats({
+            total_members: Number(stats.total_members),
+            active_members: Number(stats.active_members ?? 0),
+            total_poin_issued: Number(stats.total_poin_issued ?? 0),
+          });
         }
       })
       .catch(() => { /* keep mock */ });
@@ -62,9 +71,9 @@ export default function MembersPage() {
   });
 
   const stats = {
-    total: members.length,
-    active: members.filter((m) => m.last_transaction !== "").length,
-    totalPoin: members.reduce((s, m) => s + m.poin, 0),
+    total: apiStats?.total_members ?? members.length,
+    active: apiStats?.active_members ?? members.filter((m) => m.last_transaction !== "-").length,
+    totalPoin: apiStats?.total_poin_issued ?? members.reduce((s, m) => s + m.poin, 0),
   };
 
   const handleSave = async () => {
@@ -75,27 +84,15 @@ export default function MembersPage() {
       // Reload list after register
       const res = await membersApi.getList();
       const payload = res as Record<string, unknown>;
-      const list = Array.isArray(payload.data) ? payload.data : [];
-      if (list.length > 0) {
-        const mapped = list.map((m: Record<string, unknown>, i: number) => ({
-          member_id: String(m.id ?? m.member_id ?? `#VIP-${i}`),
-          nama: String(m.name ?? m.nama ?? ""),
-          phone_number: String(m.phone_number ?? ""),
-          level: (String(m.level ?? m.tier ?? "Bronze")) as "Gold" | "Silver" | "Bronze",
-          poin: Number(m.points ?? m.poin ?? 0),
-          join_date: String(m.created_at ?? m.join_date ?? "").split("T")[0],
-          last_transaction: String(m.last_transaction ?? "-"),
-        }));
-        setMembers(mapped);
-      } else {
-        // Optimistic fallback
-        setMembers((prev) => [...prev, {
-          member_id: `#VIP-${String(Math.floor(1000 + Math.random() * 9000))}`,
-          nama: form.nama, phone_number: form.phone_number,
-          level: form.level as "Gold" | "Silver" | "Bronze",
-          poin: form.poin_awal, join_date: new Date().toISOString().split("T")[0], last_transaction: "-",
-        }]);
-      }
+      const d = (payload.data ?? {}) as Record<string, unknown>;
+      const items = Array.isArray(d.items) ? d.items as Record<string, unknown>[] : [];
+      if (items.length > 0) setMembers(mapMembers(items));
+      else setMembers((prev) => [...prev, {
+        member_id: `VIP-${Math.floor(1000 + Math.random() * 9000)}`,
+        nama: form.nama, phone_number: form.phone_number,
+        level: form.level as "Gold" | "Silver" | "Bronze",
+        poin: form.poin_awal, join_date: new Date().toISOString().split("T")[0], last_transaction: "-",
+      }]);
       toast.success("Member VIP berhasil ditambahkan!");
       setShowAddModal(false);
       setForm({ nama: "", phone_number: "", level: "Bronze", poin_awal: 0 });
