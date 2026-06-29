@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import TopNav from "@/components/layout/TopNav";
-import { TrendingUp, TrendingDown, FileText, Users, BarChart2, AlertTriangle, Clock, Printer, XCircle, LogIn, Package } from "lucide-react";
+import { TrendingUp, TrendingDown, FileText, Users, BarChart2, AlertTriangle, Clock, Printer, XCircle, LogIn, Package, Loader2 } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { formatRupiah } from "@/lib/utils";
 import { dashboardApi } from "@/lib/api";
@@ -77,16 +77,54 @@ const colorMap: Record<string, string> = {
 };
 
 export default function DashboardPage() {
-  const [data, setData] = useState<DashboardData>(mockData);
+  const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const today = new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
   useEffect(() => {
+    setLoading(true);
     dashboardApi.getOverview()
       .then(setData)
-      .catch(() => { /* keep mock data on error */ })
+      .catch(() => setData(null))
       .finally(() => setLoading(false));
   }, []);
+
+  if (loading) {
+    return (
+      <div className="flex-1 flex flex-col min-h-screen">
+        <TopNav />
+        <main className="flex-1 flex items-center justify-center p-6">
+          <div className="flex flex-col items-center gap-2">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+            <p className="text-sm text-gray-500">Memuat data dashboard...</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="flex-1 flex flex-col min-h-screen">
+        <TopNav />
+        <main className="flex-1 flex items-center justify-center p-6">
+          <div className="text-center">
+            <p className="text-lg font-semibold text-gray-700">Gagal memuat ringkasan dashboard</p>
+            <p className="text-sm text-gray-400 mt-1">Silakan coba lagi beberapa saat lagi atau hubungi administrator.</p>
+            <button onClick={() => {
+              setLoading(true);
+              dashboardApi.getOverview()
+                .then(setData)
+                .catch(() => setData(null))
+                .finally(() => setLoading(false));
+            }} className="btn-primary text-sm mt-4 inline-block">
+              Muat Ulang
+            </button>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   const { summary, peringatan_stok, produk_terlaris, aktivitas_terbaru, metode_pembayaran, daily_sales_chart } = data;
 

@@ -9,24 +9,9 @@ import { membersApi } from "@/lib/api";
 
 type Member = VipMember;
 
-const MOCK_MEMBERS: Member[] = [
-  { member_id: "#VIP-0892", nama: "Budi Santoso", phone_number: "0812-3456-7890", level: "Gold", poin: 2450, join_date: "2023-01-12", last_transaction: "2 days ago" },
-  { member_id: "#VIP-0901", nama: "Siti Rahmawati", phone_number: "0856-7890-1234", level: "Silver", poin: 840, join_date: "2023-03-05", last_transaction: "1 week ago" },
-  { member_id: "#VIP-0955", nama: "Agus Wijaya", phone_number: "0899-1122-3344", level: "Bronze", poin: 120, join_date: "2023-08-22", last_transaction: "3 weeks ago" },
-  { member_id: "#VIP-1022", nama: "CV. Bangun Sentosa", phone_number: "0811-2233-4455", level: "Gold", poin: 5100, join_date: "2022-02-10", last_transaction: "Today" },
-];
-
-const levelBadge = (l: string) => {
-  const style: Record<string, string> = {
-    Gold: "bg-yellow-100 text-yellow-700",
-    Silver: "bg-gray-100 text-gray-600",
-    Bronze: "bg-orange-100 text-orange-700",
-  };
-  return <span className={`px-2.5 py-0.5 text-xs font-bold rounded-full ${style[l] ?? ""}`}>{l}</span>;
-};
-
 export default function MembersPage() {
-  const [members, setMembers] = useState<Member[]>(MOCK_MEMBERS);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterLevel, setFilterLevel] = useState("All Levels");
   const [showAddModal, setShowAddModal] = useState(false);
@@ -35,17 +20,33 @@ export default function MembersPage() {
   const [saving, setSaving] = useState(false);
   const [apiStats, setApiStats] = useState<{ total_members: number; active_members: number; total_poin_issued: number } | null>(null);
 
-  useEffect(() => {
+  // Redeem state
+  const [redeemForm, setRedeemForm] = useState({ member_id: "", poin_ditukar: 0, jenis_penukaran: "CASHBACK" });
+  const [redeeming, setRedeeming] = useState(false);
+
+  const fetchMembers = () => {
+    setLoading(true);
     membersApi.getVipMembers({ limit: 100 })
       .then((res) => {
-        setMembers(res.items);
-        setApiStats(res.stats);
+        setMembers(res?.items || []);
+        setApiStats(res?.stats || null);
       })
-      .catch(() => { /* keep mock */ });
+      .catch((err) => {
+        console.error(err);
+        toast.error("Gagal memuat daftar member VIP");
+        setMembers([]);
+      })
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchMembers();
   }, []);
 
   const filtered = members.filter((m) => {
-    const matchSearch = m.nama.toLowerCase().includes(search.toLowerCase()) || m.phone_number.includes(search);
+    const namaMatch = m.nama ? m.nama.toLowerCase().includes(search.toLowerCase()) : false;
+    const phoneMatch = m.phone_number ? m.phone_number.includes(search) : false;
+    const matchSearch = namaMatch || phoneMatch;
     const matchLevel = filterLevel === "All Levels" || m.level === filterLevel;
     return matchSearch && matchLevel;
   });
@@ -53,7 +54,16 @@ export default function MembersPage() {
   const stats = {
     total: apiStats?.total_members ?? members.length,
     active: apiStats?.active_members ?? members.filter((m) => m.last_transaction !== "").length,
-    totalPoin: apiStats?.total_poin_issued ?? members.reduce((s, m) => s + m.poin, 0),
+    totalPoin: apiStats?.total_poin_issued ?? members.reduce((s, m) => s + (m.poin || 0), 0),
+  };
+
+  const levelBadge = (l: string) => {
+    const styles: Record<string, string> = {
+      Gold: "bg-amber-100 text-amber-700 border border-amber-200",
+      Silver: "bg-slate-100 text-slate-700 border border-slate-200",
+      Bronze: "bg-orange-100 text-orange-700 border border-orange-200",
+    };
+    return <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${styles[l] ?? "bg-gray-100 text-gray-700"}`}>{l}</span>;
   };
 
   const handleSave = async () => {
@@ -73,12 +83,45 @@ export default function MembersPage() {
       toast.success("Member VIP berhasil ditambahkan!");
       setShowAddModal(false);
       setForm({ nama: "", phone_number: "", level: "Bronze", poin_awal: 0 });
+      fetchMembers();
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
       toast.error(msg ?? "Gagal menambahkan member");
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleRedeem = async () => {
+    if (!redeemForm.member_id) {
+      toast.error("Pilih member terlebih dahulu");
+      return;
+    }
+    if (redeemForm.poin_ditukar <= 0) {
+      toast.error("Jumlah poin harus lebih dari 0");
+      return;
+    }
+    setRedeeming(true);
+    try {
+      const res = await membersApi.redeemPoints(redeemForm.member_id, {
+        poin_ditukar: redeemForm.poin_ditukar,
+        jenis_penukaran: redeemForm.jenis_penukaran,
+      });
+      toast.success(res.message || "Poin berhasil ditukarkan!");
+      setShowRedeem(false);
+      setRedeemForm({ member_id: "", poin_ditukar: 0, jenis_penukaran: "CASHBACK" });
+      fetchMembers();
+    } catch (err: any) {
+      const msg = err.response?.data?.message || "Gagal menukar poin";
+      toast.error(msg);
+    } finally {
+      setRedeeming(false);
+    }
+  };
+
+  const handleExport = () => {
+    toast.success("Mengekspor data member...");
+    window.open("/api/v1/members/vip/export", "_blank");
   };
 
   return (
@@ -92,7 +135,7 @@ export default function MembersPage() {
             <p className="text-sm text-gray-500 mt-0.5">Overview and administration of loyalty program members.</p>
           </div>
           <div className="flex items-center gap-2">
-            <button className="btn-secondary text-sm"><Download size={15} /> Export List</button>
+            <button onClick={handleExport} className="btn-secondary text-sm"><Download size={15} /> Export List</button>
             <button onClick={() => setShowRedeem(true)} className="btn-secondary text-sm"><Gift size={15} /> Redeem Points</button>
             <button onClick={() => setShowAddModal(true)} className="btn-primary text-sm"><Plus size={15} /> Tambah Member Baru</button>
           </div>
@@ -146,22 +189,41 @@ export default function MembersPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((m) => (
-                  <tr key={m.member_id} className="animate-fade-in">
-                    <td className="font-mono text-sm font-semibold text-gray-700">{m.member_id}</td>
-                    <td className="font-medium text-gray-900">{m.nama}</td>
-                    <td className="text-gray-600 text-sm">{m.phone_number}</td>
-                    <td>{levelBadge(m.level)}</td>
-                    <td className="font-semibold text-gray-800">{m.poin.toLocaleString("id-ID")}</td>
-                    <td className="text-gray-500 text-sm">{new Date(m.join_date).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}</td>
-                    <td className="text-gray-500 text-sm">{m.last_transaction}</td>
-                    <td>
-                      <button className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors">
-                        <MoreVertical size={15} />
-                      </button>
+                {loading ? (
+                  <tr>
+                    <td colSpan={8} className="text-center py-8">
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <Loader2 className="animate-spin text-blue-600" size={24} />
+                        <span className="text-sm text-gray-500">Memuat data member...</span>
+                      </div>
                     </td>
                   </tr>
-                ))}
+                ) : filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="text-center py-8 text-sm text-gray-400">
+                      Belum ada member VIP terdaftar.
+                    </td>
+                  </tr>
+                ) : (
+                  filtered.map((m) => (
+                    <tr key={m.member_id} className="animate-fade-in">
+                      <td className="font-mono text-sm font-semibold text-gray-700">{m.member_id}</td>
+                      <td className="font-medium text-gray-900">{m.nama}</td>
+                      <td className="text-gray-600 text-sm">{m.phone_number}</td>
+                      <td>{levelBadge(m.level)}</td>
+                      <td className="font-semibold text-gray-800">{(m.poin || 0).toLocaleString("id-ID")}</td>
+                      <td className="text-gray-500 text-sm">
+                        {m.join_date ? new Date(m.join_date).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) : "-"}
+                      </td>
+                      <td className="text-gray-500 text-sm">{m.last_transaction || "-"}</td>
+                      <td>
+                        <button className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors">
+                          <MoreVertical size={15} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -215,6 +277,52 @@ export default function MembersPage() {
               <button onClick={handleSave} disabled={saving} className="btn-primary">
                 {saving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
                 Simpan Member
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Redeem Modal */}
+      {showRedeem && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 modal-overlay">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl modal-content mx-4">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <h3 className="text-base font-bold text-gray-900">Penukaran Poin Member VIP</h3>
+              <button onClick={() => setShowRedeem(false)}><X size={18} className="text-gray-400" /></button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <label className="form-label">Pilih Member VIP</label>
+                <select value={redeemForm.member_id} onChange={(e) => {
+                  const m = members.find(x => x.member_id === e.target.value);
+                  setRedeemForm({ ...redeemForm, member_id: e.target.value, poin_ditukar: m ? Math.min(100, m.poin) : 0 });
+                }} className="form-select">
+                  <option value="">-- Pilih Member --</option>
+                  {members.map(m => (
+                    <option key={m.member_id} value={m.member_id}>{m.nama} (Poin: {m.poin || 0})</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="form-label">Poin yang Ditukar</label>
+                <input type="number" value={redeemForm.poin_ditukar || ""} onChange={(e) => setRedeemForm({ ...redeemForm, poin_ditukar: +e.target.value })}
+                  placeholder="Contoh: 100" className="form-input" min={1} />
+              </div>
+              <div>
+                <label className="form-label">Jenis Penukaran</label>
+                <select value={redeemForm.jenis_penukaran} onChange={(e) => setRedeemForm({ ...redeemForm, jenis_penukaran: e.target.value })} className="form-select">
+                  <option value="CASHBACK">Cashback</option>
+                  <option value="VOUCHER">Voucher</option>
+                  <option value="GIFT">Hadiah / Barang</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100">
+              <button onClick={() => setShowRedeem(false)} className="btn-secondary">Batal</button>
+              <button onClick={handleRedeem} disabled={redeeming} className="btn-primary">
+                {redeeming ? <Loader2 size={14} className="animate-spin" /> : <Gift size={14} />}
+                Tukarkan Poin
               </button>
             </div>
           </div>

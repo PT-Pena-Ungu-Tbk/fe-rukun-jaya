@@ -25,11 +25,13 @@ const mockItems: BulkItem[] = [
 ];
 
 export default function BulkUpdatePage() {
-  const [items, setItems] = useState<BulkItem[]>(mockItems);
+  const [items, setItems] = useState<BulkItem[]>([]);
   const [saving, setSaving] = useState(false);
   const [gudang, setGudang] = useState("gudang_utama");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    setLoading(true);
     inventoryApi.getProducts()
       .then((res) => {
         if (res.data?.length) {
@@ -41,9 +43,16 @@ export default function BulkUpdatePage() {
             kode_rak: p.rack_location ?? "",
             keterangan: "",
           })));
+        } else {
+          setItems([]);
         }
       })
-      .catch(() => { /* keep mock */ });
+      .catch(() => {
+        setItems([]);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, []);
 
   const updateField = (id: string, field: keyof BulkItem, value: string | number) => {
@@ -153,49 +162,66 @@ export default function BulkUpdatePage() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((item) => {
-                  const selisih = item.stok_fisik_baru - item.stok_sistem;
-                  return (
-                    <tr key={item.item_id} className="animate-fade-in">
-                      <td><input type="checkbox" className="rounded" /></td>
-                      <td>
-                        <Link href={`/inventory/${item.item_id}`} className="font-mono text-sm font-semibold text-blue-600 hover:underline">
-                          {item.item_id}
-                        </Link>
-                      </td>
-                      <td className="text-gray-800 font-medium">{item.nama_barang}</td>
-                      <td className="text-gray-600">{item.stok_sistem.toLocaleString("id-ID")}</td>
-                      <td>
-                        <input
-                          type="number"
-                          value={item.stok_fisik_baru}
-                          onChange={(e) => updateField(item.item_id, "stok_fisik_baru", +e.target.value)}
-                          className={`w-24 px-2 py-1 text-sm font-bold border rounded text-center focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
-                            selisih !== 0 ? "border-blue-300 bg-blue-50 text-blue-800" : "border-gray-200"}`}
-                        />
-                        {selisih !== 0 && (
-                          <span className={`ml-1 text-xs font-medium ${selisih > 0 ? "text-green-600" : "text-red-600"}`}>
-                            {selisih > 0 ? "+" : ""}{selisih}
-                          </span>
-                        )}
-                      </td>
-                      <td>
-                        <input
-                          value={item.kode_rak}
-                          onChange={(e) => updateField(item.item_id, "kode_rak", e.target.value)}
-                          className="w-24 px-2 py-1 text-sm border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      </td>
-                      <td>
-                        <input
-                          value={item.keterangan}
-                          onChange={(e) => updateField(item.item_id, "keterangan", e.target.value)}
-                          className="w-40 px-2 py-1 text-sm border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      </td>
-                    </tr>
-                  );
-                })}
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} className="px-5 py-10 text-center text-gray-500">
+                      <div className="flex items-center justify-center gap-2">
+                        <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                        <span>Memuat data inventaris...</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : items.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-5 py-10 text-center text-gray-400 text-sm">
+                      Tidak ada barang di inventaris.
+                    </td>
+                  </tr>
+                ) : (
+                  items.map((item) => {
+                    const selisih = item.stok_fisik_baru - item.stok_sistem;
+                    return (
+                      <tr key={item.item_id} className="animate-fade-in">
+                        <td><input type="checkbox" className="rounded" /></td>
+                        <td>
+                          <Link href={`/inventory/${item.item_id}`} className="font-mono text-sm font-semibold text-blue-600 hover:underline">
+                            {item.item_id}
+                          </Link>
+                        </td>
+                        <td className="text-gray-800 font-medium">{item.nama_barang}</td>
+                        <td className="text-gray-600">{item.stok_sistem.toLocaleString("id-ID")}</td>
+                        <td>
+                          <input
+                            type="number"
+                            value={item.stok_fisik_baru}
+                            onChange={(e) => updateField(item.item_id, "stok_fisik_baru", +e.target.value)}
+                            className={`w-24 px-2 py-1 text-sm font-bold border rounded text-center focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
+                              selisih !== 0 ? "border-blue-300 bg-blue-50 text-blue-800" : "border-gray-200"}`}
+                          />
+                          {selisih !== 0 && (
+                            <span className={`ml-1 text-xs font-medium ${selisih > 0 ? "text-green-600" : "text-red-600"}`}>
+                              {selisih > 0 ? "+" : ""}{selisih}
+                            </span>
+                          )}
+                        </td>
+                        <td>
+                          <input
+                            value={item.kode_rak}
+                            onChange={(e) => updateField(item.item_id, "kode_rak", e.target.value)}
+                            className="w-24 px-2 py-1 text-sm border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </td>
+                        <td>
+                          <input
+                            value={item.keterangan}
+                            onChange={(e) => updateField(item.item_id, "keterangan", e.target.value)}
+                            className="w-40 px-2 py-1 text-sm border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>

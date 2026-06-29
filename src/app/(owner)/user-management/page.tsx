@@ -22,12 +22,6 @@ const toStaff = (e: Employee): Staff => ({
   email: e.email,
 });
 
-const MOCK_STAFF: Staff[] = [
-  { id: "STF001", employee_id: "STF001", full_name: "Andi Wijaya", jabatan: "Owner", login_time: "07.30 WIB", is_active: true, email: "andi.wijaya@lumbertrack.com" },
-  { id: "STF002", employee_id: "STF002", full_name: "Siti Aminah", jabatan: "Cashier", login_time: "07.30 WIB", is_active: true, email: "siti@lumbertrack.com" },
-  { id: "STF003", employee_id: "STF003", full_name: "Budi Santoso", jabatan: "Cashier", login_time: "07.30 WIB", is_active: false, email: "budi@lumbertrack.com" },
-];
-
 const jabatanBadge = (j: string) => {
   const styles: Record<string, string> = {
     Owner: "bg-blue-100 text-blue-700",
@@ -39,7 +33,8 @@ const jabatanBadge = (j: string) => {
 };
 
 export default function UserManagementPage() {
-  const [staff, setStaff] = useState<Staff[]>(MOCK_STAFF);
+  const [staff, setStaff] = useState<Staff[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [editStaff, setEditStaff] = useState<Staff | null>(null);
@@ -49,9 +44,15 @@ export default function UserManagementPage() {
   const [showPass, setShowPass] = useState(false);
 
   useEffect(() => {
+    setLoading(true);
     employeesApi.getList()
-      .then((res) => setStaff(res.data.map(toStaff)))
-      .catch(() => { /* keep mock */ });
+      .then((res) => setStaff(res.data?.map(toStaff) || []))
+      .catch((err) => {
+        console.error(err);
+        toast.error("Gagal memuat daftar karyawan");
+        setStaff([]);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const filtered = staff.filter((s) =>
@@ -159,8 +160,24 @@ export default function UserManagementPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((s) => (
-                  <tr key={s.id} className="animate-fade-in">
+                {loading ? (
+                  <tr>
+                    <td colSpan={6} className="text-center py-8">
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <Loader2 className="animate-spin text-blue-600" size={24} />
+                        <span className="text-sm text-gray-500">Memuat data karyawan...</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="text-center py-8 text-sm text-gray-400">
+                      Belum ada karyawan terdaftar.
+                    </td>
+                  </tr>
+                ) : (
+                  filtered.map((s) => (
+                    <tr key={s.id} className="animate-fade-in">
                     <td className="font-mono text-sm font-semibold text-gray-600">{s.employee_id}</td>
                     <td className="font-semibold text-gray-900">{s.full_name}</td>
                     <td>{jabatanBadge(s.jabatan)}</td>
@@ -184,7 +201,8 @@ export default function UserManagementPage() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                ))
+              )}
               </tbody>
             </table>
           </div>

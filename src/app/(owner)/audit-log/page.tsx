@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import TopNav from "@/components/layout/TopNav";
-import { Download, Calendar, Pencil, Trash2, LogIn, RotateCcw, ChevronLeft, ChevronRight } from "lucide-react";
+import { Download, Calendar, Pencil, Trash2, LogIn, RotateCcw, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { auditApi } from "@/lib/api";
 
 interface AuditEntry {
@@ -82,10 +82,12 @@ const toAktivitas = (a: string): AuditEntry["aktivitas"] => {
 export default function AuditLogPage() {
   const [jenisFilter, setJenisFilter] = useState("Semua Aktivitas");
   const [dateRange] = useState("01 Okt 2023 - 07 Okt 2023");
-  const [logs, setLogs] = useState<AuditEntry[]>(mockLogs);
-  const [totalItems, setTotalItems] = useState(128);
+  const [logs, setLogs] = useState<AuditEntry[]>([]);
+  const [totalItems, setTotalItems] = useState(0);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    setLoading(true);
     auditApi.getLogs()
       .then((res) => {
         const items = res.data ?? [];
@@ -110,10 +112,16 @@ export default function AuditLogPage() {
             nilai_baru: item.nilai_baru ? String(item.nilai_baru) : undefined,
           };
         });
-        if (mapped.length > 0) setLogs(mapped);
+        setLogs(mapped);
         setTotalItems(items.length);
       })
-      .catch(() => { /* keep mock */ });
+      .catch(() => {
+        setLogs([]);
+        setTotalItems(0);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, []);
 
   const filtered = logs.filter((l) =>
@@ -182,63 +190,80 @@ export default function AuditLogPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {filtered.map((log) => {
-                const config = activityConfig[log.aktivitas];
-                return (
-                  <tr key={log.id} className="hover:bg-gray-50 transition-colors animate-fade-in">
-                    {/* User */}
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-full ${log.user.color} flex items-center justify-center text-white text-xs font-bold flex-shrink-0 overflow-hidden`}>
-                          {log.user.photo ? (
-                            <span className="text-sm">{log.user.avatar}</span>
-                          ) : (
-                            <span>{log.user.avatar}</span>
-                          )}
+              {loading ? (
+                <tr>
+                  <td colSpan={4} className="px-5 py-10 text-center text-slate-500">
+                    <div className="flex items-center justify-center gap-2">
+                      <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                      <span>Memuat log audit...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="px-5 py-10 text-center text-slate-400 text-sm">
+                    Tidak ada aktivitas log audit yang tercatat.
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((log) => {
+                  const config = activityConfig[log.aktivitas];
+                  return (
+                    <tr key={log.id} className="hover:bg-gray-50 transition-colors animate-fade-in">
+                      {/* User */}
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-full ${log.user.color} flex items-center justify-center text-white text-xs font-bold flex-shrink-0 overflow-hidden`}>
+                            {log.user.photo ? (
+                              <span className="text-sm">{log.user.avatar}</span>
+                            ) : (
+                              <span>{log.user.avatar}</span>
+                            )}
+                          </div>
+                          <div>
+                            <p className="font-semibold text-gray-900 text-sm leading-tight">{log.user.nama}</p>
+                            <p className="text-xs text-gray-400 mt-0.5">{log.user.jabatan}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-semibold text-gray-900 text-sm leading-tight">{log.user.nama}</p>
-                          <p className="text-xs text-gray-400 mt-0.5">{log.user.jabatan}</p>
-                        </div>
-                      </div>
-                    </td>
+                      </td>
 
-                    {/* Waktu */}
-                    <td className="px-5 py-4">
-                      <p className="text-sm font-medium text-gray-800">{log.tanggal}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">{log.waktu}</p>
-                    </td>
+                      {/* Waktu */}
+                      <td className="px-5 py-4">
+                        <p className="text-sm font-medium text-gray-800">{log.tanggal}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{log.waktu}</p>
+                      </td>
 
-                    {/* Aktivitas Badge */}
-                    <td className="px-5 py-4">
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold ${config.bg} ${config.text}`}>
-                        {config.icon}
-                        {config.label}
-                      </span>
-                    </td>
+                      {/* Aktivitas Badge */}
+                      <td className="px-5 py-4">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold ${config.bg} ${config.text}`}>
+                          {config.icon}
+                          {config.label}
+                        </span>
+                      </td>
 
-                    {/* Detail */}
-                    <td className="px-5 py-4">
-                      <p className="text-sm font-semibold text-gray-900">{log.detail_utama}</p>
-                      {log.nilai_lama && (
-                        <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
-                          <span className="line-through text-gray-400">{log.nilai_lama}</span>
-                          <span className="text-gray-400">→</span>
-                          <span className="text-blue-600 font-bold">{log.nilai_baru}</span>
-                        </p>
-                      )}
-                      {log.detail_sub && (
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          {log.detail_sub}{" "}
-                          {log.status_text && (
-                            <span className={`font-semibold ${log.status_color}`}>{log.status_text}</span>
-                          )}
-                        </p>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
+                      {/* Detail */}
+                      <td className="px-5 py-4">
+                        <p className="text-sm font-semibold text-gray-900">{log.detail_utama}</p>
+                        {log.nilai_lama && (
+                          <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
+                            <span className="line-through text-gray-400">{log.nilai_lama}</span>
+                            <span className="text-gray-400">→</span>
+                            <span className="text-blue-600 font-bold">{log.nilai_baru}</span>
+                          </p>
+                        )}
+                        {log.detail_sub && (
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            {log.detail_sub}{" "}
+                            {log.status_text && (
+                              <span className={`font-semibold ${log.status_color}`}>{log.status_text}</span>
+                            )}
+                          </p>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
 

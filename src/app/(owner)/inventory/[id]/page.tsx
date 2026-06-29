@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import TopNav from "@/components/layout/TopNav";
 import Link from "next/link";
-import { ChevronRight, Printer, Pencil, Plus, TrendingUp, TrendingDown } from "lucide-react";
+import { ChevronRight, Printer, Pencil, Plus, TrendingUp, TrendingDown, Loader2 } from "lucide-react";
 import { formatRupiah } from "@/lib/utils";
 import { inventoryApi } from "@/lib/api";
 import type { Product } from "@/types";
@@ -36,15 +36,49 @@ const mockProduct = {
 export default function ProductDetailPage() {
   const { id } = useParams();
   const [product, setProduct] = useState<Product | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!id || Array.isArray(id)) return;
+    setLoading(true);
     inventoryApi.getProduct(id)
       .then((res) => setProduct(res.data))
-      .catch(() => setProduct(null));
+      .catch(() => setProduct(null))
+      .finally(() => setLoading(false));
   }, [id]);
 
-  const p = product ? {
+  if (loading) {
+    return (
+      <div className="flex-1 flex flex-col min-h-screen">
+        <TopNav />
+        <main className="flex-1 flex items-center justify-center p-6">
+          <div className="flex flex-col items-center gap-2">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+            <p className="text-sm text-gray-500">Memuat detail produk...</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (!product) {
+    return (
+      <div className="flex-1 flex flex-col min-h-screen">
+        <TopNav />
+        <main className="flex-1 flex items-center justify-center p-6">
+          <div className="text-center">
+            <p className="text-lg font-semibold text-gray-700">Produk tidak ditemukan</p>
+            <p className="text-sm text-gray-400 mt-1">ID produk yang Anda cari tidak valid atau telah dihapus.</p>
+            <Link href="/inventory" className="btn-primary text-sm mt-4 inline-block">
+              Kembali ke Inventaris
+            </Link>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  const p = {
     item_id: product.id,
     nama_barang: product.name,
     sku: product.sku_code,
@@ -65,7 +99,7 @@ export default function ProductDetailPage() {
     distribusi: [
       { lokasi: product.rack_location ?? "Gudang Utama", stok: product.current_stock, min_stok: product.min_stock },
     ],
-  } : mockProduct;
+  };
 
   const margin = ((p.harga_jual - p.harga_beli) / p.harga_beli * 100).toFixed(1);
 

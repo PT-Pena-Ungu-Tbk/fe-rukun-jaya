@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import TopNav from "@/components/layout/TopNav";
-import { Download, Plus, RotateCcw, MoreVertical, ExternalLink } from "lucide-react";
+import { Download, Plus, RotateCcw, MoreVertical, ExternalLink, AlertTriangle } from "lucide-react";
 import { formatRupiah } from "@/lib/utils";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
@@ -73,6 +73,16 @@ export default function TransactionHistoryPage() {
     <div className="flex-1 flex flex-col min-h-screen">
       <TopNav />
       <main className="flex-1 p-6 animate-fade-in">
+        {/* API Disclaimer Banner */}
+        <div className="mb-5 bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3 shadow-sm">
+          <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <h4 className="text-sm font-semibold text-amber-800">Simulasi Riwayat Transaksi</h4>
+            <p className="text-xs text-amber-700 mt-0.5">
+              Data riwayat transaksi, diagram pendapatan, dan log audit transaksi di bawah ini adalah simulasi. Backend API belum menyediakan endpoint untuk riwayat transaksi lengkap <code className="bg-amber-100 px-1.5 py-0.5 rounded font-mono text-[11px]">GET /api/v1/transactions</code>.
+            </p>
+          </div>
+        </div>
 
         {/* Header */}
         <div className="flex items-start justify-between mb-5">

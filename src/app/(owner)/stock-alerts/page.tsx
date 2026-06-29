@@ -4,22 +4,21 @@ import { useState } from "react";
 import TopNav from "@/components/layout/TopNav";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { inventoryApi } from "@/lib/api";
-import { mockProducts } from "@/lib/mockData";
 import { getStockStatus } from "@/types";
 import StockBadge from "@/components/ui/StockBadge";
-import { AlertTriangle, XCircle, TrendingDown, Truck, Package, Warehouse, Check, Download, Plus } from "lucide-react";
+import { AlertTriangle, XCircle, TrendingDown, Truck, Package, Warehouse, Check, Download, Plus, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 
 export default function StockAlertsPage() {
   const [selected, setSelected] = useState<string[]>([]);
   const qc = useQueryClient();
 
-  const { data } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["products", "low_stock"],
     queryFn: () => inventoryApi.getProducts({ low_stock: true }),
   });
 
-  const products = data?.data ?? mockProducts;
+  const products = data?.data ?? [];
   const lowStockItems = products.filter((p) => getStockStatus(p) !== "In Stock");
   const outOfStock = products.filter((p) => p.current_stock === 0);
   const belowMin = products.filter(
@@ -146,32 +145,49 @@ export default function StockAlertsPage() {
               </tr>
             </thead>
             <tbody>
-              {lowStockItems.map((p) => (
-                <tr key={p.id}>
-                  <td>
-                    <input
-                      type="checkbox"
-                      checked={selected.includes(p.id)}
-                      onChange={() => toggleSelect(p.id)}
-                      className="rounded"
-                    />
-                  </td>
-                  <td className="text-xs font-mono text-slate-600">{p.sku_code}</td>
-                  <td className="text-xs font-medium text-slate-800">{p.name}</td>
-                  <td className={`text-sm font-bold ${p.current_stock === 0 ? "text-red-600" : "text-amber-600"}`}>
-                    {p.current_stock}
-                  </td>
-                  <td className="text-xs text-slate-500">{p.min_stock} units</td>
-                  <td>
-                    <StockBadge product={p} />
-                  </td>
-                  <td>
-                    <button className="text-xs text-blue-600 hover:underline font-medium">
-                      Restock
-                    </button>
+              {isLoading ? (
+                <tr>
+                  <td colSpan={7} className="px-5 py-10 text-center text-slate-500">
+                    <div className="flex items-center justify-center gap-2">
+                      <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                      <span>Memuat data stok rendah...</span>
+                    </div>
                   </td>
                 </tr>
-              ))}
+              ) : lowStockItems.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-5 py-10 text-center text-slate-400 text-sm">
+                    Tidak ada produk dengan stok menipis/habis.
+                  </td>
+                </tr>
+              ) : (
+                lowStockItems.map((p) => (
+                  <tr key={p.id}>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={selected.includes(p.id)}
+                        onChange={() => toggleSelect(p.id)}
+                        className="rounded"
+                      />
+                    </td>
+                    <td className="text-xs font-mono text-slate-600">{p.sku_code}</td>
+                    <td className="text-xs font-medium text-slate-800">{p.name}</td>
+                    <td className={`text-sm font-bold ${p.current_stock === 0 ? "text-red-600" : "text-amber-600"}`}>
+                      {p.current_stock}
+                    </td>
+                    <td className="text-xs text-slate-500">{p.min_stock} units</td>
+                    <td>
+                      <StockBadge product={p} />
+                    </td>
+                    <td>
+                      <button className="text-xs text-blue-600 hover:underline font-medium">
+                        Restock
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

@@ -93,9 +93,9 @@ export const membersApi = {
   verifyMember: (phone: string) =>
     apiClient.get<ApiOk<Member>>("/members/verify", { params: { phone } }).then((r) => r.data),
   getVipMembers: (params?: { level?: string; q?: string; page?: number; limit?: number }) =>
-    apiClient.get<VipMembersListResponse>("/members/vip", { params }).then((r) => r.data),
+    apiClient.get<ApiOk<VipMembersListResponse>>("/members/vip", { params }).then((r) => r.data.data),
   createVipMember: (data: CreateVipMemberRequest) =>
-    apiClient.post<VipMember>("/members/vip", data).then((r) => r.data),
+    apiClient.post<ApiOk<VipMember>>("/members/vip", data).then((r) => r.data.data),
   redeemPoints: (memberId: string, data: { poin_ditukar: number; jenis_penukaran: string; transaction_id?: string }) =>
     apiClient.post<ApiMsg & { sisa_poin?: number }>(`/members/vip/${memberId}/redeem`, data).then((r) => r.data),
 };
