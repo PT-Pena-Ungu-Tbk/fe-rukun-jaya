@@ -32,11 +32,7 @@ export default function WarehousePage() {
 
   return (
     <div className="flex flex-col h-full">
-      <TopNav
-        title="Warehouse Stock & Allocation"
-        searchPlaceholder="Search products, SKUs, or zones..."
-        showSearch
-      />
+      <TopNav title="Warehouse Stock & Allocation" />
       <div className="p-6 overflow-auto">
         <div className="mb-5">
           <h2 className="text-xl font-bold text-slate-800">Warehouse Stock & Allocation</h2>

@@ -78,7 +78,7 @@ export default function TransactionHistoryPage() {
         <div className="flex items-start justify-between mb-5">
           <div>
             <h2 className="text-lg font-bold text-gray-900">Overview</h2>
-            <p className="text-sm text-gray-500">A snapshot of your store's financial performance.</p>
+            <p className="text-sm text-gray-500">A snapshot of your store&apos;s financial performance.</p>
           </div>
           <div className="flex items-center gap-2">
             <button className="btn-secondary text-sm"><Download size={14} /> Export CSV</button>

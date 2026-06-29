@@ -20,6 +20,7 @@ const FALLBACK_PRODUCTS: Product[] = [
 ];
 
 const filterTabs = ["Semua", "Nama", "SKU", "Rak"];
+const paymentMethods = ["CASH", "TRANSFER", "QRIS", "CREDIT"] as const;
 
 export default function POSPage() {
   const [search, setSearch] = useState("");
@@ -41,7 +42,7 @@ export default function POSPage() {
   // Fetch products from API (debounced)
   const fetchProducts = useCallback(async (q: string) => {
     try {
-      const result = await inventoryApi.getProducts({ search: q || undefined });
+      const result = await transactionsApi.searchProducts({ search: q || undefined });
       if (result.data?.length) setProducts(result.data);
     } catch {
       // keep fallback data
@@ -57,7 +58,7 @@ export default function POSPage() {
     if (!search) return true;
     const s = search.toLowerCase();
     if (activeFilter === "SKU") return p.sku_code.toLowerCase().includes(s);
-    if (activeFilter === "Rak") return p.rack_location.toLowerCase().includes(s);
+    if (activeFilter === "Rak") return (p.rack_location ?? "").toLowerCase().includes(s);
     return p.name.toLowerCase().includes(s) || p.sku_code.toLowerCase().includes(s);
   });
 
@@ -75,7 +76,7 @@ export default function POSPage() {
 
   const removeFromCart = (id: string) => setCart((prev) => prev.filter((c) => c.product.id !== id));
 
-  const subtotal = cart.reduce((s, c) => s + c.product.harga_jual * c.qty, 0);
+  const subtotal = cart.reduce((s, c) => s + Number(c.product.sell_price) * c.qty, 0);
   const discountAmt = discountType === "%" ? subtotal * (discountValue / 100) : discountValue;
   const ppn = (subtotal - discountAmt) * 0.11;
   const grandTotal = subtotal - discountAmt + ppn;
@@ -87,7 +88,7 @@ export default function POSPage() {
     try {
       const result = await membersApi.verifyMember(vipPhone);
       if (result.data) {
-        setVipMember({ nama: result.data.name, level: "Gold", poin: 0 });
+        setVipMember({ nama: result.data.name, level: result.data.level ?? "Gold", poin: result.data.points ?? 0 });
         toast.success(`Member VIP ditemukan: ${result.data.name}`);
       } else {
         toast.error("Nomor tidak terdaftar sebagai member VIP");
@@ -109,9 +110,10 @@ export default function POSPage() {
         discount_type: discountType === "%" ? "PERCENTAGE" : "NOMINAL",
         discount_value: discountValue,
         cash_paid: cashPaid,
+        payment_method: paymentMethod,
         items: cart.map((c) => ({ product_id: c.product.id, quantity: c.qty })),
       });
-      if (result.data?.invoice_no) setTrxId(result.data.invoice_no);
+      if (result.data?.transaction_id || result.data?.invoice_no) setTrxId(result.data.transaction_id ?? result.data.invoice_no ?? trxId);
       setShowReceipt(true);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
@@ -174,7 +176,7 @@ export default function POSPage() {
                     <tr key={p.id} onClick={() => addToCart(p)} className="cursor-pointer">
                       <td className="text-blue-600 font-medium">{p.name}</td>
                       <td className="font-mono text-xs text-gray-500">{p.sku_code}</td>
-                      <td className="text-gray-500 text-xs">{p.rack_location}</td>
+                      <td className="text-gray-500 text-xs">{p.rack_location ?? "-"}</td>
                       <td className={`font-semibold ${p.current_stock < p.min_stock ? "text-amber-600" : "text-gray-800"}`}>{p.current_stock.toLocaleString("id-ID")}</td>
                       <td>{statusBadge(p.current_stock === 0 ? "OUT_OF_STOCK" : p.current_stock <= p.min_stock ? "LOW_STOCK" : "IN_STOCK")}</td>
                     </tr>
@@ -204,8 +206,8 @@ export default function POSPage() {
                   cart.map((item) => (
                     <div key={item.product.id} className="flex items-start justify-between gap-2 animate-fade-in">
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-800 truncate">{item.product.nama_barang}</p>
-                        <p className="text-xs text-gray-400">{formatRupiah(item.product.harga_jual)}</p>
+                        <p className="text-sm font-medium text-gray-800 truncate">{item.product.name}</p>
+                        <p className="text-xs text-gray-400">{formatRupiah(Number(item.product.sell_price))}</p>
                       </div>
                       <div className="flex items-center gap-1 flex-shrink-0">
                         <button onClick={() => updateQty(item.product.id, -1)} className="w-5 h-5 flex items-center justify-center border border-gray-200 rounded text-gray-500 hover:bg-gray-100"><Minus size={10} /></button>
@@ -213,7 +215,7 @@ export default function POSPage() {
                         <button onClick={() => updateQty(item.product.id, 1)} className="w-5 h-5 flex items-center justify-center border border-gray-200 rounded text-gray-500 hover:bg-gray-100"><Plus size={10} /></button>
                       </div>
                       <div className="text-right flex-shrink-0">
-                        <p className="text-sm font-semibold text-gray-800">{formatRupiah(item.product.harga_jual * item.qty)}</p>
+                        <p className="text-sm font-semibold text-gray-800">{formatRupiah(Number(item.product.sell_price) * item.qty)}</p>
                         <button onClick={() => removeFromCart(item.product.id)} className="text-xs text-red-400 hover:underline">Hapus</button>
                       </div>
                     </div>
@@ -256,7 +258,7 @@ export default function POSPage() {
               <div className="p-3 border-b border-gray-100">
                 <p className="text-xs font-semibold text-gray-600 mb-2">Metode Pembayaran</p>
                 <div className="grid grid-cols-2 gap-1.5">
-                  {["CASH", "TRANSFER", "QRIS", "CREDIT"].map((m) => (
+                  {paymentMethods.map((m) => (
                     <button key={m} onClick={() => setPaymentMethod(m)}
                       className={`py-1.5 text-xs font-medium rounded-lg border transition-colors ${paymentMethod === m ? "bg-blue-600 text-white border-blue-600" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}>
                       {m === "CASH" ? "Tunai" : m === "TRANSFER" ? "Transfer" : m === "QRIS" ? "QRIS" : "Kredit"}
@@ -393,11 +395,11 @@ export default function POSPage() {
                   {cart.map((c, i) => (
                     <tr key={c.product.id} className="border-b border-gray-50">
                       <td className="py-2.5 px-3 text-gray-500">{i + 1}</td>
-                      <td className="py-2.5 px-3 font-medium text-gray-800">{c.product.nama_barang}</td>
-                      <td className="py-2.5 px-3 font-mono text-xs text-gray-500">{c.product.kode_sku}</td>
+                      <td className="py-2.5 px-3 font-medium text-gray-800">{c.product.name}</td>
+                      <td className="py-2.5 px-3 font-mono text-xs text-gray-500">{c.product.sku_code}</td>
                       <td className="py-2.5 px-3 text-center text-gray-700">{c.qty}</td>
-                      <td className="py-2.5 px-3 text-right text-gray-700">{formatRupiah(c.product.harga_jual)}</td>
-                      <td className="py-2.5 px-3 text-right font-semibold text-gray-900">{formatRupiah(c.product.harga_jual * c.qty)}</td>
+                      <td className="py-2.5 px-3 text-right text-gray-700">{formatRupiah(Number(c.product.sell_price))}</td>
+                      <td className="py-2.5 px-3 text-right font-semibold text-gray-900">{formatRupiah(Number(c.product.sell_price) * c.qty)}</td>
                     </tr>
                   ))}
                 </tbody>

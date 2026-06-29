@@ -89,21 +89,27 @@ export default function AuditLogPage() {
     auditApi.getLogs()
       .then((res) => {
         const items = res.data ?? [];
-        const mapped: AuditEntry[] = items.map((item: Record<string, unknown>, idx: number) => ({
-          id: String(idx),
-          user: {
-            nama: (item.user as Record<string, string>)?.nama ?? (item.user_name as string) ?? "User",
-            jabatan: (item.user as Record<string, string>)?.jabatan ?? (item.role as string) ?? "-",
-            avatar: ((item.user as Record<string, string>)?.nama ?? "U").split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase(),
-            color: ["bg-purple-400", "bg-blue-600", "bg-gray-400", "bg-green-500"][idx % 4],
-          },
-          tanggal: new Date(String(item.created_at ?? item.waktu ?? Date.now())).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }),
-          waktu: new Date(String(item.created_at ?? item.waktu ?? Date.now())).toLocaleTimeString("id-ID") + " WIB",
-          aktivitas: toAktivitas(String(item.aktivitas ?? item.action ?? "LOGIN")),
-          detail_utama: String(item.detail_perubahan ?? item.description ?? "-"),
-          nilai_lama: item.nilai_lama ? String(item.nilai_lama) : undefined,
-          nilai_baru: item.nilai_baru ? String(item.nilai_baru) : undefined,
-        }));
+        const mapped: AuditEntry[] = items.map((raw, idx: number) => {
+          const item = raw as unknown as Record<string, unknown>;
+          const user = item.user as Record<string, string> | undefined;
+          const userName = user?.nama ?? (item.user_name as string) ?? String(item.user_id ?? "User");
+          const changes = item.changes_payload ? JSON.stringify(item.changes_payload) : undefined;
+          return {
+            id: String(item.id ?? idx),
+            user: {
+              nama: userName,
+              jabatan: user?.jabatan ?? (item.role as string) ?? "-",
+              avatar: userName.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase(),
+              color: ["bg-purple-400", "bg-blue-600", "bg-gray-400", "bg-green-500"][idx % 4],
+            },
+            tanggal: new Date(String(item.created_at ?? item.waktu ?? Date.now())).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }),
+            waktu: new Date(String(item.created_at ?? item.waktu ?? Date.now())).toLocaleTimeString("id-ID") + " WIB",
+            aktivitas: toAktivitas(String(item.aktivitas ?? item.action ?? "LOGIN")),
+            detail_utama: String(item.detail_perubahan ?? changes ?? item.description ?? "-"),
+            nilai_lama: item.nilai_lama ? String(item.nilai_lama) : undefined,
+            nilai_baru: item.nilai_baru ? String(item.nilai_baru) : undefined,
+          };
+        });
         if (mapped.length > 0) setLogs(mapped);
         setTotalItems(items.length);
       })

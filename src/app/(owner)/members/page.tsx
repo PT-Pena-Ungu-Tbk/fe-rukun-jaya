@@ -5,6 +5,7 @@ import TopNav from "@/components/layout/TopNav";
 import { Plus, Download, Gift, MoreVertical, X, Loader2, Users, UserCheck, Star } from "lucide-react";
 import toast from "react-hot-toast";
 import type { VipMember } from "@/types";
+import { membersApi } from "@/lib/api";
 
 type Member = VipMember;
 
@@ -32,9 +33,16 @@ export default function MembersPage() {
   const [showRedeem, setShowRedeem] = useState(false);
   const [form, setForm] = useState({ nama: "", phone_number: "", level: "Bronze", poin_awal: 0 });
   const [saving, setSaving] = useState(false);
+  const [apiStats, setApiStats] = useState<{ total_members: number; active_members: number; total_poin_issued: number } | null>(null);
 
-  // Members endpoint belum ada di real API (hanya /members/verify ada)
-  // → pakai mock data, tambah secara lokal
+  useEffect(() => {
+    membersApi.getVipMembers({ limit: 100 })
+      .then((res) => {
+        setMembers(res.items);
+        setApiStats(res.stats);
+      })
+      .catch(() => { /* keep mock */ });
+  }, []);
 
   const filtered = members.filter((m) => {
     const matchSearch = m.nama.toLowerCase().includes(search.toLowerCase()) || m.phone_number.includes(search);
@@ -43,29 +51,31 @@ export default function MembersPage() {
   });
 
   const stats = {
-    total: members.length,
-    active: members.filter((m) => m.last_transaction !== "").length,
-    totalPoin: members.reduce((s, m) => s + m.poin, 0),
+    total: apiStats?.total_members ?? members.length,
+    active: apiStats?.active_members ?? members.filter((m) => m.last_transaction !== "").length,
+    totalPoin: apiStats?.total_poin_issued ?? members.reduce((s, m) => s + m.poin, 0),
   };
 
   const handleSave = async () => {
+    if (!form.nama.trim() || !form.phone_number.trim()) {
+      toast.error("Nama dan nomor HP wajib diisi");
+      return;
+    }
     setSaving(true);
     try {
-      const newMember: Member = {
-        member_id: `#VIP-${String(Math.floor(1000 + Math.random() * 9000))}`,
+      const newMember = await membersApi.createVipMember({
         nama: form.nama,
         phone_number: form.phone_number,
         level: form.level as "Gold" | "Silver" | "Bronze",
-        poin: form.poin_awal,
-        join_date: new Date().toISOString().split("T")[0],
-        last_transaction: "-",
-      };
+        poin_awal: form.poin_awal,
+      });
       setMembers((prev) => [...prev, newMember]);
       toast.success("Member VIP berhasil ditambahkan!");
       setShowAddModal(false);
       setForm({ nama: "", phone_number: "", level: "Bronze", poin_awal: 0 });
-    } catch {
-      toast.error("Gagal menambahkan member");
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(msg ?? "Gagal menambahkan member");
     } finally {
       setSaving(false);
     }

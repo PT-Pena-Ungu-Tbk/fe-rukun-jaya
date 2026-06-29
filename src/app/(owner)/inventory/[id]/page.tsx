@@ -1,10 +1,13 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import TopNav from "@/components/layout/TopNav";
 import Link from "next/link";
 import { ChevronRight, Printer, Pencil, Plus, TrendingUp, TrendingDown } from "lucide-react";
 import { formatRupiah } from "@/lib/utils";
+import { inventoryApi } from "@/lib/api";
+import type { Product } from "@/types";
 
 const mockProduct = {
   item_id: "INV-001",
@@ -32,7 +35,37 @@ const mockProduct = {
 
 export default function ProductDetailPage() {
   const { id } = useParams();
-  const p = mockProduct;
+  const [product, setProduct] = useState<Product | null>(null);
+
+  useEffect(() => {
+    if (!id || Array.isArray(id)) return;
+    inventoryApi.getProduct(id)
+      .then((res) => setProduct(res.data))
+      .catch(() => setProduct(null));
+  }, [id]);
+
+  const p = product ? {
+    item_id: product.id,
+    nama_barang: product.name,
+    sku: product.sku_code,
+    kondisi: product.defective_stock > 0 ? "Rusak Ringan" : "Baru",
+    kategori: product.category ?? product.category_id ?? "-",
+    satuan: "Unit",
+    berat: "-",
+    dimensi: "-",
+    supplier: product.supplier ?? product.supplier_id ?? "-",
+    exp_date: "-",
+    garansi: "-",
+    deskripsi: "",
+    harga_beli: Number(product.buy_price),
+    harga_jual: Number(product.sell_price),
+    stok_total: product.current_stock,
+    nilai_inventaris: product.current_stock * Number(product.buy_price),
+    gambar: [],
+    distribusi: [
+      { lokasi: product.rack_location ?? "Gudang Utama", stok: product.current_stock, min_stok: product.min_stock },
+    ],
+  } : mockProduct;
 
   const margin = ((p.harga_jual - p.harga_beli) / p.harga_beli * 100).toFixed(1);
 

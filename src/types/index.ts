@@ -44,9 +44,9 @@ export interface ApiUser {
 }
 
 export interface LoginRequest {
-  /** Real API uses "email" field */
-  email: string;
+  email_or_username: string;
   password: string;
+  remember_me?: boolean;
 }
 
 export interface LoginResponse {
@@ -85,13 +85,18 @@ export interface CheckoutRequest {
   discount_type: "NOMINAL" | "PERCENTAGE";
   discount_value: number;
   cash_paid: number;
+  payment_method?: "CASH" | "TRANSFER" | "QRIS" | "CREDIT";
+  payment_reference?: string;
+  customer_name?: string;
   items: { product_id: string; quantity: number }[];
 }
 
 export interface Transaction {
   id?: string;
+  transaction_id?: string;
   invoice_no?: string;
   total?: number;
+  grand_total?: number;
   status?: string;
   created_at?: string;
 }
@@ -382,11 +387,16 @@ export interface TransactionOverview {
 
 // ===== STAFF =====
 export interface StaffMember {
-  id_karyawan: string;
-  nama_lengkap: string;
-  jabatan: string;
+  id?: string;
+  id_karyawan?: string;
+  employee_id?: string;
+  nama_lengkap?: string;
+  full_name?: string;
+  jabatan?: string;
+  role?: UserRole;
   login_time?: string;
   is_active: boolean;
+  last_active?: string;
   last_activity?: string;
 }
 
@@ -451,18 +461,52 @@ export interface AuditLog {
 }
 
 // ===== LEGACY COMPAT (used in old pages) =====
+export interface Supplier {
+  id: string;
+  supplier_id: string;
+  vendor_name: string;
+  category: string;
+  primary_contact: string;
+  phone: string;
+  status: "Active" | "Inactive" | "On Hold" | string;
+  rating: number;
+}
+
+export interface TransactionHistory {
+  id: string;
+  invoice_no: string;
+  date: string;
+  customer: string;
+  customer_type: string;
+  method: string;
+  total_amount: string;
+  status: "Success" | "Pending" | "Cancelled" | string;
+  cashier: string;
+}
+
+export interface StorageZone {
+  name: string;
+  description: string;
+  capacity_percentage: number;
+  status: string;
+  rack_range: string;
+  zone_type: string;
+}
+
 export interface Product {
   id: string;
   sku_code: string;
   name: string;
-  category: string;
-  supplier: string;
+  category?: string;
+  supplier?: string;
+  category_id?: string;
+  supplier_id?: string;
   buy_price: string;
   sell_price: string;
   current_stock: number;
   defective_stock: number;
   min_stock: number;
-  rack_location: string;
+  rack_location?: string | null;
 }
 
 export function getStockStatus(product: Product): "In Stock" | "Low Stock" | "Out of Stock" {

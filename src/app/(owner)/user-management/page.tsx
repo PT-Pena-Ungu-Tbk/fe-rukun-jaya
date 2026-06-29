@@ -59,9 +59,18 @@ export default function UserManagementPage() {
   );
 
   const toggleAccess = (id: string) => {
-    // tidak ada endpoint toggle — optimistic UI update
+    const previous = staff;
     setStaff((prev) => prev.map((s) => s.id === id ? { ...s, is_active: !s.is_active } : s));
-    toast.success("Status akses diperbarui");
+    employeesApi.toggleAccess(id)
+      .then((res) => {
+        setStaff((prev) => prev.map((s) => s.id === id ? { ...s, is_active: res.is_active } : s));
+        toast.success(res.message ?? "Status akses diperbarui");
+      })
+      .catch((err: unknown) => {
+        setStaff(previous);
+        const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+        toast.error(msg ?? "Gagal mengubah status akses");
+      });
   };
 
   const handleAdd = async () => {
@@ -89,7 +98,11 @@ export default function UserManagementPage() {
     if (!editStaff) return;
     setSaving(true);
     try {
-      await employeesApi.update(editStaff.id, { name: editStaff.full_name });
+      await employeesApi.update(editStaff.id, {
+        name: editStaff.full_name,
+        email: editStaff.email,
+        role: editStaff.jabatan === "Owner" ? "OWNER" : "CASHIER",
+      });
       setStaff((prev) => prev.map((s) => s.id === editStaff.id ? editStaff : s));
       toast.success("Data karyawan diperbarui!");
       setEditStaff(null);
@@ -205,7 +218,7 @@ export default function UserManagementPage() {
                   <label className="form-label">Role</label>
                   <select value={newForm.role} onChange={(e) => setNewForm({ ...newForm, role: e.target.value })} className="form-select">
                     <option value="">Select Role</option>
-                    <option>CASHIER</option><option>WAREHOUSE_ADMIN</option><option>MANAGER</option>
+                    <option>OWNER</option><option>CASHIER</option>
                   </select>
                 </div>
                 <div>
@@ -273,7 +286,7 @@ export default function UserManagementPage() {
                   <label className="form-label">Role</label>
                   <select value={editStaff.jabatan}
                     onChange={(e) => setEditStaff({ ...editStaff, jabatan: e.target.value })} className="form-select">
-                    <option>Cashier</option><option>Manager</option><option>Warehouse Admin</option>
+                    <option>Owner</option><option>Cashier</option>
                   </select>
                 </div>
                 <div>

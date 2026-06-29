@@ -5,9 +5,17 @@
 
 import { NextRequest, NextResponse } from "next/server";
 
-const BACKEND = "https://be-rukun-jaya-production.up.railway.app/api/v1";
+const BACKEND = process.env.BASE_URL_API?.replace(/\/+$/, "");
 
 async function proxy(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
+  if (!BACKEND) {
+    console.error("[proxy] BASE_URL_API is not configured in environment variables.");
+    return NextResponse.json(
+      { message: "Konfigurasi server API belum diset (BASE_URL_API)" },
+      { status: 500 }
+    );
+  }
+
   const { path } = await params;
   const url = new URL(req.url);
   const target = `${BACKEND}/${path.join("/")}${url.search}`;
@@ -47,8 +55,8 @@ async function proxy(req: NextRequest, { params }: { params: Promise<{ path: str
   }
 }
 
-export const GET     = proxy;
-export const POST    = proxy;
-export const PUT     = proxy;
-export const PATCH   = proxy;
-export const DELETE  = proxy;
+export const GET = proxy;
+export const POST = proxy;
+export const PUT = proxy;
+export const PATCH = proxy;
+export const DELETE = proxy;

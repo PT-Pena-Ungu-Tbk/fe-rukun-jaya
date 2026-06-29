@@ -2,6 +2,8 @@ import axios from "axios";
 import Cookies from "js-cookie";
 
 const apiClient = axios.create({
+  // Browser calls same-origin Next proxy. The proxy reads BASE_URL_API and
+  // forwards to Railway, avoiding CORS issues on Vercel.
   baseURL: process.env.NEXT_PUBLIC_API_URL || "/api/v1",
   headers: {
     "Content-Type": "application/json",

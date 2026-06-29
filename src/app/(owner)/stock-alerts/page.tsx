@@ -43,7 +43,7 @@ export default function StockAlertsPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <TopNav title="Stock Alerts & Replenishment" showSearch={false} />
+      <TopNav title="Stock Alerts & Replenishment" />
       <div className="p-6 overflow-auto">
         {/* Header */}
         <div className="mb-6">
@@ -60,7 +60,7 @@ export default function StockAlertsPage() {
                 Action Required: {outOfStock.length + belowMin.length} items critically low on stock
               </p>
               <p className="text-xs text-red-500 mt-0.5">
-                Immediate replenishment needed to avoid sales disruption. Review the items marked 'Out of Stock' below.
+                Immediate replenishment needed to avoid sales disruption. Review the items marked &apos;Out of Stock&apos; below.
               </p>
             </div>
           </div>

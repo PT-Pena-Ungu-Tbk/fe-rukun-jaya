@@ -21,7 +21,22 @@ const MOCK_ITEMS: InventoryItem[] = [
   { id: "INV-215", sku_code: "PPA-WAV3", name: "Pipa PVC Wavin 3 Inch", category: "Pipa", supplier: "-", buy_price: "35000", sell_price: "45000", current_stock: 75, defective_stock: 0, min_stock: 20, rack_location: "B-12" },
 ];
 
-const emptyForm = { nama_barang: "", kategori: "", kondisi: "Baru" as const, jumlah_stok_awal: 0, satuan: "", kode_rak: "", harga_beli: 0, harga_jual: 0, tanggal_kadaluarsa: "" };
+const emptyForm = {
+  nama_barang: "",
+  sku_code: "",
+  category_id: "",
+  supplier_id: "",
+  kondisi: "Baru" as const,
+  jumlah_stok_awal: 0,
+  satuan: "",
+  kode_rak: "",
+  harga_beli: 0,
+  harga_jual: 0,
+  stok_minimum: 10,
+  tanggal_kadaluarsa: "",
+};
+
+const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export default function InventoryPage() {
   const [items, setItems] = useState<InventoryItem[]>(MOCK_ITEMS);
@@ -60,15 +75,29 @@ export default function InventoryPage() {
   };
 
   const handleSave = async () => {
+    if (!form.nama_barang.trim() || !form.sku_code.trim()) {
+      toast.error("Nama barang dan SKU wajib diisi");
+      return;
+    }
+    if (!uuidRegex.test(form.category_id) || !uuidRegex.test(form.supplier_id)) {
+      toast.error("Category ID dan Supplier ID harus berupa UUID dari backend");
+      return;
+    }
+    if (form.harga_beli <= 0 || form.harga_jual <= 0) {
+      toast.error("Harga beli dan harga jual wajib lebih dari 0");
+      return;
+    }
     setSaving(true);
     try {
       await inventoryApi.createProduct({
-        sku_code: form.nama_barang.toUpperCase().replace(/\s+/g, "-").slice(0, 12),
+        sku_code: form.sku_code,
         name: form.nama_barang,
+        category_id: form.category_id,
+        supplier_id: form.supplier_id,
         buy_price: form.harga_beli,
         sell_price: form.harga_jual,
         current_stock: form.jumlah_stok_awal,
-        min_stock: 10,
+        min_stock: form.stok_minimum,
         rack_location: form.kode_rak,
       });
       toast.success("Barang berhasil ditambahkan!");
@@ -82,6 +111,19 @@ export default function InventoryPage() {
       toast.error(msg ?? "Gagal menambahkan barang");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!showDeleteModal) return;
+    try {
+      await inventoryApi.deleteProduct(showDeleteModal.id);
+      setItems((prev) => prev.filter((item) => item.id !== showDeleteModal.id));
+      toast.success("Barang dihapus");
+      setShowDeleteModal(null);
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(msg ?? "Gagal menghapus barang");
     }
   };
 
@@ -201,7 +243,7 @@ export default function InventoryPage() {
                     </td>
                     <td>
                       <Link href={`/inventory/${item.id}`} className="text-blue-600 hover:underline text-xs font-mono">
-                        {item.rack_location}
+                        {item.rack_location ?? "-"}
                       </Link>
                     </td>
                     <td>
@@ -256,19 +298,21 @@ export default function InventoryPage() {
                     <input value={form.nama_barang} onChange={(e) => setForm({ ...form, nama_barang: e.target.value })}
                       placeholder="Contoh: Semen Gresik 50kg" className="form-input" />
                   </div>
+                  <div>
+                    <label className="form-label">SKU *</label>
+                    <input value={form.sku_code} onChange={(e) => setForm({ ...form, sku_code: e.target.value })}
+                      placeholder="Contoh: SMN-GRSK-50" className="form-input font-mono" />
+                  </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="form-label">Kategori *</label>
-                      <select value={form.kategori} onChange={(e) => setForm({ ...form, kategori: e.target.value })} className="form-select">
-                        <option value="">Pilih Kategori</option>
-                        <option>Semen</option><option>Besi</option><option>Cat</option><option>Pipa</option><option>Kayu</option><option>Hardware</option>
-                      </select>
+                      <label className="form-label">Category ID *</label>
+                      <input value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })}
+                        placeholder="UUID kategori" className="form-input font-mono text-xs" />
                     </div>
                     <div>
-                      <label className="form-label">Kondisi</label>
-                      <select value={form.kondisi} onChange={(e) => setForm({ ...form, kondisi: e.target.value as "Baru" })} className="form-select">
-                        <option>Baru</option><option>Rusak Ringan</option><option>Rusak Berat</option>
-                      </select>
+                      <label className="form-label">Supplier ID *</label>
+                      <input value={form.supplier_id} onChange={(e) => setForm({ ...form, supplier_id: e.target.value })}
+                        placeholder="UUID supplier" className="form-input font-mono text-xs" />
                     </div>
                   </div>
                 </div>
@@ -282,6 +326,13 @@ export default function InventoryPage() {
                       <input type="number" value={form.jumlah_stok_awal} onChange={(e) => setForm({ ...form, jumlah_stok_awal: +e.target.value })}
                         className="form-input" min={0} />
                     </div>
+                    <div>
+                      <label className="form-label">Stok Minimum</label>
+                      <input type="number" value={form.stok_minimum} onChange={(e) => setForm({ ...form, stok_minimum: +e.target.value })}
+                        className="form-input" min={0} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="form-label">Kode Rak / Lokasi</label>
                       <input value={form.kode_rak} onChange={(e) => setForm({ ...form, kode_rak: e.target.value })}
@@ -333,8 +384,7 @@ export default function InventoryPage() {
             </p>
             <div className="flex gap-3">
               <button onClick={() => setShowDeleteModal(null)} className="btn-secondary flex-1 justify-center">Batal</button>
-              <button onClick={() => { toast.success("Barang dihapus"); setShowDeleteModal(null); }}
-                className="btn-danger flex-1 justify-center">Hapus</button>
+              <button onClick={handleDelete} className="btn-danger flex-1 justify-center">Hapus</button>
             </div>
           </div>
         </div>

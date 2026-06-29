@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, User, Lock, ArrowRight, Loader2 } from "lucide-react";
 import { saveAuth } from "@/lib/auth";
+import { authApi } from "@/lib/api";
 import toast from "react-hot-toast";
 
 export default function LoginPage() {
@@ -21,24 +22,24 @@ export default function LoginPage() {
     }
     setLoading(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "https://be-rukun-jaya-production.up.railway.app/api/v1"}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: emailOrUsername, password }),
+      const json = await authApi.login({
+        email_or_username: emailOrUsername,
+        password,
+        remember_me: true,
       });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.message ?? json.error ?? "Login gagal");
       // Real API response: { data: { access_token, user: { id, name/nama_lengkap, email, role } } }
       const payload = json.data ?? json;
-      const token = payload.access_token ?? payload.token;
-      const user = payload.user ?? {};
-      const displayName = user.name ?? user.nama_lengkap ?? user.email ?? "User";
+      const token = payload.access_token;
+      if (!token) throw new Error("Token tidak ditemukan dalam response login");
+      const user = payload.user;
+      const displayName = user.nama_lengkap ?? user.email ?? "User";
       const role = user.role ?? "CASHIER";
       saveAuth(token, { id: user.id ?? "0", name: displayName, email: user.email ?? emailOrUsername, role });
       toast.success(`Selamat datang, ${displayName}!`);
       router.push(role === "OWNER" ? "/dashboard" : "/pos");
-    } catch {
-      toast.error("Email/username atau password salah");
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message;
+      toast.error(msg ?? "Email/username atau password salah");
     } finally {
       setLoading(false);
     }

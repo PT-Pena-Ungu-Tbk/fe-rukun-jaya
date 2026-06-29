@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import TopNav from "@/components/layout/TopNav";
-import { Download, TrendingUp } from "lucide-react";
+import { Download, TrendingUp, TrendingDown } from "lucide-react";
 import { formatRupiah } from "@/lib/utils";
+import { reportsApi } from "@/lib/api";
+import type { FinanceSummary } from "@/types";
 
 const mockTransactions = [
   { id: "TRÚ-88291", tanggal: "24 Okt 2023, 14:30", pelanggan: "PT. Bangun Perkasa", metode: "Transfer Bank (BCA)", total: 45000000, status: "Sukses" },
@@ -18,6 +20,14 @@ const periods = ["Bulan Ini (Okt 2023)", "Bulan Lalu", "Custom"];
 export default function FinancialReportsPage() {
   const [period, setPeriod] = useState(periods[0]);
   const [search, setSearch] = useState("");
+  const [summary, setSummary] = useState<FinanceSummary | null>(null);
+
+  useEffect(() => {
+    const apiPeriod = period === "Bulan Lalu" ? "last_month" : "this_month";
+    reportsApi.getFinancial({ period: apiPeriod })
+      .then((res) => setSummary(res.data as FinanceSummary))
+      .catch(() => setSummary(null));
+  }, [period]);
 
   const filtered = mockTransactions.filter((t) =>
     t.pelanggan.toLowerCase().includes(search.toLowerCase()) || t.id.includes(search)
@@ -47,11 +57,12 @@ export default function FinancialReportsPage() {
               <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
                 <span className="text-blue-600 text-sm">📊</span>
               </div>
-              <p className="text-sm font-semibold text-gray-600">Total Omzet</p>
+            <p className="text-sm font-semibold text-gray-600">Total Omzet</p>
             </div>
-            <p className="text-4xl font-bold text-gray-900">{formatRupiah(1245000000)}</p>
-            <div className="flex items-center gap-1 mt-2 text-green-600 text-sm font-medium">
-              <TrendingUp size={15} /> +12.5% vs Bulan Lalu
+            <p className="text-4xl font-bold text-gray-900">{formatRupiah(summary?.total_omzet ?? 1245000000)}</p>
+            <div className={`flex items-center gap-1 mt-2 text-sm font-medium ${(summary?.persentase_omzet_vs_sebelumnya ?? 12.5) >= 0 ? "text-green-600" : "text-red-600"}`}>
+              {(summary?.persentase_omzet_vs_sebelumnya ?? 12.5) >= 0 ? <TrendingUp size={15} /> : <TrendingDown size={15} />}
+              {(summary?.persentase_omzet_vs_sebelumnya ?? 12.5) > 0 ? "+" : ""}{summary?.persentase_omzet_vs_sebelumnya ?? 12.5}% vs periode sebelumnya
             </div>
           </div>
           <div className="stat-card">
@@ -61,9 +72,10 @@ export default function FinancialReportsPage() {
               </div>
               <p className="text-sm font-semibold text-gray-600">Keuntungan Bersih</p>
             </div>
-            <p className="text-4xl font-bold text-gray-900">{formatRupiah(311250000)}</p>
-            <div className="flex items-center gap-1 mt-2 text-green-600 text-sm font-medium">
-              <TrendingUp size={15} /> +8.2% vs Bulan Lalu
+            <p className="text-4xl font-bold text-gray-900">{formatRupiah(summary?.keuntungan_bersih ?? 311250000)}</p>
+            <div className={`flex items-center gap-1 mt-2 text-sm font-medium ${(summary?.persentase_profit_vs_sebelumnya ?? 8.2) >= 0 ? "text-green-600" : "text-red-600"}`}>
+              {(summary?.persentase_profit_vs_sebelumnya ?? 8.2) >= 0 ? <TrendingUp size={15} /> : <TrendingDown size={15} />}
+              {(summary?.persentase_profit_vs_sebelumnya ?? 8.2) > 0 ? "+" : ""}{summary?.persentase_profit_vs_sebelumnya ?? 8.2}% vs periode sebelumnya
             </div>
           </div>
         </div>

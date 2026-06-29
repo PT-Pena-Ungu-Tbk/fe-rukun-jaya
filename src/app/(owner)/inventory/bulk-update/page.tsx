@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import TopNav from "@/components/layout/TopNav";
 import Link from "next/link";
 import { Download, Upload, Save, Filter, RefreshCw, Loader2, ChevronRight } from "lucide-react";
 import toast from "react-hot-toast";
+import { inventoryApi } from "@/lib/api";
 
 interface BulkItem {
   item_id: string;
@@ -28,6 +29,23 @@ export default function BulkUpdatePage() {
   const [saving, setSaving] = useState(false);
   const [gudang, setGudang] = useState("gudang_utama");
 
+  useEffect(() => {
+    inventoryApi.getProducts()
+      .then((res) => {
+        if (res.data?.length) {
+          setItems(res.data.map((p) => ({
+            item_id: p.id,
+            nama_barang: p.name,
+            stok_sistem: p.current_stock,
+            stok_fisik_baru: p.current_stock,
+            kode_rak: p.rack_location ?? "",
+            keterangan: "",
+          })));
+        }
+      })
+      .catch(() => { /* keep mock */ });
+  }, []);
+
   const updateField = (id: string, field: keyof BulkItem, value: string | number) => {
     setItems((prev) => prev.map((i) => i.item_id === id ? { ...i, [field]: value } : i));
   };
@@ -37,9 +55,18 @@ export default function BulkUpdatePage() {
 
   const handleSave = async () => {
     setSaving(true);
-    await new Promise((r) => setTimeout(r, 1200));
-    toast.success(`${items.length} barang berhasil diperbarui!`);
-    setSaving(false);
+    try {
+      await inventoryApi.bulkUpdateStock(items.map((item) => ({
+        id: item.item_id,
+        new_stock: item.stok_fisik_baru,
+      })));
+      toast.success(`${items.length} barang berhasil diperbarui!`);
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(msg ?? "Gagal memperbarui stok");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const now = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });

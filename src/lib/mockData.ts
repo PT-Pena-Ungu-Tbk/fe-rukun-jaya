@@ -236,7 +236,7 @@ export const mockTransactions: TransactionHistory[] = [
   },
 ];
 
-export const mockAuditLogs: AuditLog[] = [
+export const mockAuditLogs: any[] = [
   {
     id: "log1",
     user: "Owner",
