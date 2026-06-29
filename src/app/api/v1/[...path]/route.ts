@@ -39,8 +39,9 @@ async function proxy(req: NextRequest, { params }: { params: Promise<{ path: str
 
     const resHeaders = new Headers();
     res.headers.forEach((value, key) => {
-      // Skip hop-by-hop headers
-      if (!["connection", "keep-alive", "transfer-encoding"].includes(key.toLowerCase())) {
+      const lowerKey = key.toLowerCase();
+      // Skip hop-by-hop, content-encoding, and content-length headers
+      if (!["connection", "keep-alive", "transfer-encoding", "content-encoding", "content-length"].includes(lowerKey)) {
         resHeaders.set(key, value);
       }
     });
