@@ -152,13 +152,14 @@ export default function POSPage() {
 
     setProcessing(true);
     try {
-      const resolvedDiscountType: "NOMINAL" | "PERCENTAGE" = (discountValue === 0 || discountType === "Rp") ? "NOMINAL" : "PERCENTAGE";
-      const payload = {
-        member_id: vipMember?.id || null,
-        discount_type: resolvedDiscountType,
-        discount_value: Math.round(discountValue),
-        cash_paid: paymentMethod === "CASH" ? Math.round(cashPaid) : 0,
-        items: cart.map((c) => ({ product_id: c.product.id, quantity: c.qty })),
+      const jumlahBayar = paymentMethod === "CASH" ? Math.round(cashPaid) : Math.round(grandTotal);
+      const payload: Parameters<typeof posApi.checkout>[0] = {
+        items: cart.map((c) => ({ product_id: c.product.id, qty: c.qty })),
+        payment_method: paymentMethod as "CASH" | "QRIS" | "DEBIT" | "TRANSFER",
+        jumlah_bayar: jumlahBayar,
+        ...(vipPhone ? { vip_phone: vipPhone } : {}),
+        ...(discountType === "%" && discountValue > 0 ? { diskon_persen: discountValue } : {}),
+        ...(discountType === "Rp" && discountValue > 0 ? { diskon_nominal: Math.round(discountValue) } : {}),
       };
       console.log("[checkout] payload:", JSON.stringify(payload));
       const result = await posApi.checkout(payload);

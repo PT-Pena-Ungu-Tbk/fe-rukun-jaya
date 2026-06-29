@@ -123,11 +123,14 @@ export const posApi = {
 
   /** POST /pos/transactions */
   checkout: (data: {
-    member_id?: string | null;
-    discount_type: "PERCENTAGE" | "NOMINAL";
-    discount_value: number;
-    cash_paid: number;
-    items: { product_id: string; quantity: number }[];
+    items: { product_id: string; qty: number }[];
+    payment_method: "CASH" | "QRIS" | "DEBIT" | "TRANSFER";
+    jumlah_bayar: number;
+    vip_phone?: string;
+    diskon_persen?: number;
+    diskon_nominal?: number;
+    nama_pelanggan?: string;
+    payment_reference?: string;
   }) =>
     apiClient.post("/pos/transactions", data).then((r) => r.data),
 
