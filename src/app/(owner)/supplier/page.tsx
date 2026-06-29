@@ -29,7 +29,7 @@ const topSuppliers = [
 export default function SupplierPage() {
   return (
     <div className="flex flex-col h-full">
-      <TopNav title="Supplier Management" searchPlaceholder="Search suppliers..." />
+      <TopNav title="Supplier Management" />
       <div className="p-6 overflow-auto">
         <div className="mb-5">
           <h2 className="text-xl font-bold text-slate-800">Supplier Management</h2>

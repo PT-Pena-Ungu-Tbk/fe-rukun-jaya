@@ -5,7 +5,7 @@ import TopNav from "@/components/layout/TopNav";
 import { Search, Minus, Plus, Trash2, X, CheckCircle, Printer, Download, ShoppingCart, Loader2 } from "lucide-react";
 import { formatRupiah } from "@/lib/utils";
 import toast from "react-hot-toast";
-import { inventoryApi, membersApi, transactionsApi } from "@/lib/api";
+import { posApi, inventoryApi } from "@/lib/api";
 import type { Product } from "@/types";
 
 interface CartItem { product: Product; qty: number; }
@@ -27,7 +27,7 @@ export default function POSPage() {
   const [products, setProducts] = useState<Product[]>(FALLBACK_PRODUCTS);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [vipPhone, setVipPhone] = useState("");
-  const [vipMember, setVipMember] = useState<{ nama: string; level: string; poin: number } | null>(null);
+  const [vipMember, setVipMember] = useState<{ id: string; nama: string; level: string; poin: number } | null>(null);
   const [discountType, setDiscountType] = useState<"%" | "Rp">("%");
   const [discountValue, setDiscountValue] = useState(0);
   const [cashPaid, setCashPaid] = useState(0);
@@ -37,14 +37,46 @@ export default function POSPage() {
   const [trxId, setTrxId] = useState(`TRX-${Math.floor(88000 + Math.random() * 999)}`);
   const [checking, setChecking] = useState(false);
   const [processing, setProcessing] = useState(false);
+  // Data receipt dari API response
+  const [receiptData, setReceiptData] = useState<{
+    id: string;           // UUID — dipakai untuk retur
+    invoice_no: string;
+    subtotal: number;
+    discount_amount: number;
+    tax_amount: number;
+    grand_total: number;
+    cash_paid: number;
+    change_amount: number;
+    created_at: string;
+  } | null>(null);
 
   // Fetch products from API (debounced)
   const fetchProducts = useCallback(async (q: string) => {
+    const searchFallback = async () => {
+      const r2 = await inventoryApi.getProducts({ search: q || undefined });
+      const p2 = r2 as Record<string, unknown>;
+      const l2 = Array.isArray(p2.data) ? p2.data : [];
+      if (l2.length > 0) {
+        console.log("[POS] products dari /inventory:", l2.length, "item, ID[0]:", (l2[0] as Record<string,unknown>)?.id);
+        setProducts(l2 as Product[]);
+      } else {
+        console.warn("[POS] API kosong, pakai FALLBACK (dummy data - checkout tidak bisa)");
+      }
+    };
     try {
-      const result = await inventoryApi.getProducts({ search: q || undefined });
-      if (result.data?.length) setProducts(result.data);
-    } catch {
-      // keep fallback data
+      const result = await posApi.getProducts({ search: q || undefined });
+      const payload = result as Record<string, unknown>;
+      const list = Array.isArray(payload.data) ? payload.data : Array.isArray(result) ? result : [];
+      if (list.length > 0) {
+        console.log("[POS] products dari /pos/products:", list.length, "item, ID[0]:", (list[0] as Record<string,unknown>)?.id);
+        setProducts(list as Product[]);
+      } else {
+        console.warn("[POS] /pos/products kosong, coba /inventory...");
+        await searchFallback();
+      }
+    } catch (err) {
+      console.error("[POS] gagal fetch /pos/products:", err);
+      try { await searchFallback(); } catch (_e) { console.warn("[POS] fallback /inventory juga gagal, pakai dummy"); }
     }
   }, []);
 
@@ -75,7 +107,7 @@ export default function POSPage() {
 
   const removeFromCart = (id: string) => setCart((prev) => prev.filter((c) => c.product.id !== id));
 
-  const subtotal = cart.reduce((s, c) => s + c.product.harga_jual * c.qty, 0);
+  const subtotal = cart.reduce((s, c) => s + Number(c.product.sell_price) * c.qty, 0);
   const discountAmt = discountType === "%" ? subtotal * (discountValue / 100) : discountValue;
   const ppn = (subtotal - discountAmt) * 0.11;
   const grandTotal = subtotal - discountAmt + ppn;
@@ -85,36 +117,71 @@ export default function POSPage() {
     if (!vipPhone) return;
     setChecking(true);
     try {
-      const result = await membersApi.verifyMember(vipPhone);
-      if (result.data) {
-        setVipMember({ nama: result.data.name, level: "Gold", poin: 0 });
-        toast.success(`Member VIP ditemukan: ${result.data.name}`);
+      const result = await posApi.validateVip(vipPhone);
+      const md = (result as Record<string, unknown>).data ?? result;
+      const member = md as Record<string, unknown>;
+      if (member) {
+        setVipMember({
+          id: String(member.id ?? member.member_id ?? ""),
+          nama: String(member.name ?? member.nama ?? ""),
+          level: String(member.level ?? "Regular"),
+          poin: Number(member.points ?? member.poin ?? 0),
+        });
+        toast.success(`Member VIP ditemukan: ${member.name ?? member.nama}`);
       } else {
         toast.error("Nomor tidak terdaftar sebagai member VIP");
       }
-    } catch {
+    } catch (_e) {
       toast.error("Nomor tidak terdaftar sebagai member VIP");
     } finally {
       setChecking(false);
     }
   };
 
+  const isUUID = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
   const handleCheckout = async () => {
     if (cart.length === 0) { toast.error("Keranjang kosong"); return; }
     if (paymentMethod === "CASH" && cashPaid < grandTotal) { toast.error("Jumlah bayar kurang"); return; }
+
+    const nonUUID = cart.find((c) => !isUUID(c.product.id));
+    if (nonUUID) {
+      toast.error(`Produk "${nonUUID.product.name}" belum sinkron dari server. Coba cari ulang produk.`);
+      return;
+    }
+
     setProcessing(true);
     try {
-      const result = await transactionsApi.checkout({
-        member_id: vipMember ? vipPhone : null,
-        discount_type: discountType === "%" ? "PERCENTAGE" : "NOMINAL",
-        discount_value: discountValue,
-        cash_paid: cashPaid,
+      const resolvedDiscountType: "NOMINAL" | "PERCENTAGE" = (discountValue === 0 || discountType === "Rp") ? "NOMINAL" : "PERCENTAGE";
+      const payload = {
+        member_id: vipMember?.id || null,
+        discount_type: resolvedDiscountType,
+        discount_value: Math.round(discountValue),
+        cash_paid: paymentMethod === "CASH" ? Math.round(cashPaid) : 0,
         items: cart.map((c) => ({ product_id: c.product.id, quantity: c.qty })),
-      });
-      if (result.data?.invoice_no) setTrxId(result.data.invoice_no);
+      };
+      console.log("[checkout] payload:", JSON.stringify(payload));
+      const result = await posApi.checkout(payload);
+      const rawResult = result as Record<string, unknown>;
+      const d = (rawResult.data ?? result) as Record<string, unknown>;
+      if (d?.invoice_no) setTrxId(String(d.invoice_no));
+      const receipt = {
+        id: String(d?.id ?? ""),
+        invoice_no: String(d?.invoice_no ?? trxId),
+        subtotal: Number(d?.subtotal ?? subtotal),
+        discount_amount: Number(d?.discount_amount ?? discountAmt),
+        tax_amount: Number(d?.tax_amount ?? ppn),
+        grand_total: Number(d?.grand_total ?? grandTotal),
+        cash_paid: Number(d?.cash_paid ?? cashPaid),
+        change_amount: Number(d?.change_amount ?? Math.max(0, change)),
+        created_at: String(d?.created_at ?? new Date().toISOString()),
+      };
+      setReceiptData(receipt);
       setShowReceipt(true);
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      const axiosErr = err as { response?: { data?: { message?: string; error?: string }; status?: number } };
+      const msg = axiosErr?.response?.data?.message ?? axiosErr?.response?.data?.error;
+      console.error("[checkout] error:", axiosErr?.response?.status, axiosErr?.response?.data);
       toast.error(msg ?? "Transaksi gagal diproses");
     } finally {
       setProcessing(false);
@@ -124,7 +191,7 @@ export default function POSPage() {
   const resetTransaction = () => {
     setCart([]); setVipPhone(""); setVipMember(null);
     setDiscountValue(0); setCashPaid(0);
-    setShowReceipt(false); setShowDetail(false);
+    setShowReceipt(false); setShowDetail(false); setReceiptData(null);
     toast.success("Transaksi baru dimulai");
   };
 
@@ -204,8 +271,8 @@ export default function POSPage() {
                   cart.map((item) => (
                     <div key={item.product.id} className="flex items-start justify-between gap-2 animate-fade-in">
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-800 truncate">{item.product.nama_barang}</p>
-                        <p className="text-xs text-gray-400">{formatRupiah(item.product.harga_jual)}</p>
+                        <p className="text-sm font-medium text-gray-800 truncate">{item.product.name}</p>
+                        <p className="text-xs text-gray-400">{formatRupiah(Number(item.product.sell_price))}</p>
                       </div>
                       <div className="flex items-center gap-1 flex-shrink-0">
                         <button onClick={() => updateQty(item.product.id, -1)} className="w-5 h-5 flex items-center justify-center border border-gray-200 rounded text-gray-500 hover:bg-gray-100"><Minus size={10} /></button>
@@ -213,7 +280,7 @@ export default function POSPage() {
                         <button onClick={() => updateQty(item.product.id, 1)} className="w-5 h-5 flex items-center justify-center border border-gray-200 rounded text-gray-500 hover:bg-gray-100"><Plus size={10} /></button>
                       </div>
                       <div className="text-right flex-shrink-0">
-                        <p className="text-sm font-semibold text-gray-800">{formatRupiah(item.product.harga_jual * item.qty)}</p>
+                        <p className="text-sm font-semibold text-gray-800">{formatRupiah(Number(item.product.sell_price) * item.qty)}</p>
                         <button onClick={() => removeFromCart(item.product.id)} className="text-xs text-red-400 hover:underline">Hapus</button>
                       </div>
                     </div>
@@ -257,7 +324,7 @@ export default function POSPage() {
                 <p className="text-xs font-semibold text-gray-600 mb-2">Metode Pembayaran</p>
                 <div className="grid grid-cols-2 gap-1.5">
                   {["CASH", "TRANSFER", "QRIS", "CREDIT"].map((m) => (
-                    <button key={m} onClick={() => setPaymentMethod(m)}
+                    <button key={m} onClick={() => setPaymentMethod(m as "CASH" | "TRANSFER" | "QRIS" | "CREDIT")}
                       className={`py-1.5 text-xs font-medium rounded-lg border transition-colors ${paymentMethod === m ? "bg-blue-600 text-white border-blue-600" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}>
                       {m === "CASH" ? "Tunai" : m === "TRANSFER" ? "Transfer" : m === "QRIS" ? "QRIS" : "Kredit"}
                     </button>
@@ -312,13 +379,30 @@ export default function POSPage() {
             </div>
             <h3 className="text-2xl font-bold text-gray-900 mb-1">Pembayaran Berhasil!</h3>
             <p className="text-sm text-gray-500 mb-1">Transaksi #{trxId} telah diproses.</p>
-            <p className="text-xs text-gray-400 mb-6">{new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}, {new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })} WIB</p>
+            <p className="text-xs text-gray-400 mb-6">
+              {receiptData
+                ? new Date(receiptData.created_at).toLocaleString("id-ID", { dateStyle: "long", timeStyle: "short" })
+                : new Date().toLocaleString("id-ID", { dateStyle: "long", timeStyle: "short" })
+              } WIB
+            </p>
 
             <div className="bg-blue-50 rounded-xl p-4 mb-6 text-left space-y-1.5">
-              <div className="flex justify-between text-sm"><span className="text-gray-500">Grand Total</span><span className="font-bold text-blue-700 text-lg">{formatRupiah(grandTotal)}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-gray-500">Grand Total</span><span className="font-bold text-blue-700 text-lg">{formatRupiah(receiptData?.grand_total ?? grandTotal)}</span></div>
               <div className="flex justify-between text-sm"><span className="text-gray-500">Metode</span><span className="font-medium text-gray-800">{paymentMethod === "CASH" ? "Tunai" : paymentMethod === "TRANSFER" ? "Transfer" : paymentMethod}</span></div>
-              {paymentMethod === "CASH" && cashPaid > 0 && (
-                <div className="flex justify-between text-sm"><span className="text-gray-500">Kembalian</span><span className="font-medium text-gray-800">{formatRupiah(Math.max(0, change))}</span></div>
+              {paymentMethod === "CASH" && (
+                <div className="flex justify-between text-sm"><span className="text-gray-500">Kembalian</span><span className="font-medium text-gray-800">{formatRupiah(receiptData?.change_amount ?? Math.max(0, change))}</span></div>
+              )}
+              {receiptData?.id && (
+                <div className="pt-2 border-t border-blue-100 mt-1">
+                  <p className="text-xs text-gray-400 mb-1">Transaction ID (untuk retur)</p>
+                  <div className="flex items-center gap-2">
+                    <code className="text-xs font-mono text-gray-600 bg-white rounded px-2 py-1 flex-1 truncate">{receiptData.id}</code>
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(receiptData.id); }}
+                      className="text-xs text-blue-600 hover:underline flex-shrink-0"
+                    >Copy</button>
+                  </div>
+                </div>
               )}
             </div>
 
@@ -393,11 +477,11 @@ export default function POSPage() {
                   {cart.map((c, i) => (
                     <tr key={c.product.id} className="border-b border-gray-50">
                       <td className="py-2.5 px-3 text-gray-500">{i + 1}</td>
-                      <td className="py-2.5 px-3 font-medium text-gray-800">{c.product.nama_barang}</td>
-                      <td className="py-2.5 px-3 font-mono text-xs text-gray-500">{c.product.kode_sku}</td>
+                      <td className="py-2.5 px-3 font-medium text-gray-800">{c.product.name}</td>
+                      <td className="py-2.5 px-3 font-mono text-xs text-gray-500">{c.product.sku_code}</td>
                       <td className="py-2.5 px-3 text-center text-gray-700">{c.qty}</td>
-                      <td className="py-2.5 px-3 text-right text-gray-700">{formatRupiah(c.product.harga_jual)}</td>
-                      <td className="py-2.5 px-3 text-right font-semibold text-gray-900">{formatRupiah(c.product.harga_jual * c.qty)}</td>
+                      <td className="py-2.5 px-3 text-right text-gray-700">{formatRupiah(Number(c.product.sell_price))}</td>
+                      <td className="py-2.5 px-3 text-right font-semibold text-gray-900">{formatRupiah(Number(c.product.sell_price) * c.qty)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -407,13 +491,19 @@ export default function POSPage() {
             {/* Summary */}
             <div className="px-6 py-4">
               <div className="flex flex-col items-end gap-1.5 text-sm text-gray-600">
-                <div className="flex justify-between w-64"><span>Subtotal</span><span>{formatRupiah(subtotal)}</span></div>
-                <div className="flex justify-between w-64"><span>Diskon (Member)</span><span className="text-red-500">- {formatRupiah(discountAmt)}</span></div>
-                <div className="flex justify-between w-64"><span>PPN 11%</span><span>{formatRupiah(ppn)}</span></div>
+                <div className="flex justify-between w-64"><span>Subtotal</span><span>{formatRupiah(receiptData?.subtotal ?? subtotal)}</span></div>
+                <div className="flex justify-between w-64"><span>Diskon</span><span className="text-red-500">- {formatRupiah(receiptData?.discount_amount ?? discountAmt)}</span></div>
+                <div className="flex justify-between w-64"><span>Pajak</span><span>{formatRupiah(receiptData?.tax_amount ?? ppn)}</span></div>
                 <div className="flex justify-between w-64 pt-2 border-t border-gray-200 mt-1">
                   <span className="font-bold text-gray-800">Grand Total</span>
-                  <span className="text-2xl font-bold text-blue-700">{formatRupiah(grandTotal)}</span>
+                  <span className="text-2xl font-bold text-blue-700">{formatRupiah(receiptData?.grand_total ?? grandTotal)}</span>
                 </div>
+                {paymentMethod === "CASH" && (
+                  <div className="flex justify-between w-64 text-gray-500 mt-1">
+                    <span>Kembalian</span>
+                    <span className="font-medium text-gray-800">{formatRupiah(receiptData?.change_amount ?? Math.max(0, change))}</span>
+                  </div>
+                )}
               </div>
             </div>
 

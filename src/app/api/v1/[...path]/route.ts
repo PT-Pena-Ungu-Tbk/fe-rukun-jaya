@@ -12,38 +12,38 @@ async function proxy(req: NextRequest, { params }: { params: Promise<{ path: str
   const url = new URL(req.url);
   const target = `${BACKEND}/${path.join("/")}${url.search}`;
 
-  // Forward headers tapi hapus host (biar ga conflict)
+  // Forward headers tapi hapus host & accept-encoding
+  // (accept-encoding dihapus supaya Railway kirim plain text, bukan gzip)
   const headers = new Headers();
   req.headers.forEach((value, key) => {
-    if (key.toLowerCase() !== "host") headers.set(key, value);
+    const k = key.toLowerCase();
+    if (k !== "host" && k !== "accept-encoding") headers.set(key, value);
   });
 
   const isBodyMethod = !["GET", "HEAD"].includes(req.method);
+  const body = isBodyMethod ? await req.text() : undefined;
 
   try {
     const res = await fetch(target, {
       method: req.method,
       headers,
-      body: isBodyMethod ? req.body : undefined,
-      // @ts-ignore — duplex needed for streaming body in Node
-      duplex: "half",
+      body,
     });
 
-    const resHeaders = new Headers();
-    res.headers.forEach((value, key) => {
-      // Skip hop-by-hop headers
-      if (!["connection", "keep-alive", "transfer-encoding"].includes(key.toLowerCase())) {
-        resHeaders.set(key, value);
-      }
-    });
+    // Baca response sebagai text (Node.js fetch sudah auto-decompress gzip)
+    const text = await res.text();
 
-    return new NextResponse(res.body, {
+    if (!res.ok) {
+      console.error(`[proxy] ${req.method} ${target} → ${res.status}`, text.slice(0, 500));
+    }
+
+    return new NextResponse(text, {
       status: res.status,
-      headers: resHeaders,
+      headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
     console.error("[proxy] fetch error:", err);
-    return NextResponse.json({ message: "Backend tidak dapat dijangkau" }, { status: 502 });
+    return NextResponse.json({ message: "Backend tidak dapat dijangkau", error: String(err) }, { status: 502 });
   }
 }
 

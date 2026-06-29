@@ -24,7 +24,7 @@ export default function LoginPage() {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "https://be-rukun-jaya-production.up.railway.app/api/v1"}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: emailOrUsername, password }),
+        body: JSON.stringify({ email_or_username: emailOrUsername, password }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.message ?? json.error ?? "Login gagal");
@@ -37,8 +37,9 @@ export default function LoginPage() {
       saveAuth(token, { id: user.id ?? "0", name: displayName, email: user.email ?? emailOrUsername, role });
       toast.success(`Selamat datang, ${displayName}!`);
       router.push(role === "OWNER" ? "/dashboard" : "/pos");
-    } catch {
-      toast.error("Email/username atau password salah");
+    } catch (err) {
+      console.error("[login error]", err);
+      toast.error("Email atau password salah");
     } finally {
       setLoading(false);
     }

@@ -1,113 +1,75 @@
 /**
  * API Layer — Toko Rukun Jaya
- * Base URL: https://be-rukun-jaya-production.up.railway.app/api/v1
- * Auth: Bearer JWT (attached by axios interceptor)
+ * Base URL proxied via /api/v1/[...path]/route.ts → Railway backend
  *
- * Endpoint aktual (dari dokumentasi JSON resmi):
- * POST   /auth/login
- * GET    /products?search=&low_stock=
- * POST   /products
- * PUT    /products/bulk-update
- * GET    /members/verify?phone=
- * POST   /transactions/checkout
- * POST   /transactions/return
- * GET    /reports/financial?start_date=&end_date=
- * GET    /audit-logs
- * GET    /employees
- * POST   /employees
- * PUT    /employees/:id
- * DELETE /employees/:id
+ * Endpoint aktual (dokumentasi v4):
+ * POST   /auth/login | /auth/refresh | /auth/logout
+ * GET    /inventory  | POST /inventory | GET|PUT|DELETE /inventory/{id}
+ * PUT    /inventory/bulk-update
+ * GET    /staff  | POST | GET|PUT|DELETE /staff/{id}
+ * PATCH  /staff/{id}/toggle-access
+ * GET    /members/vip | POST /members/vip
+ * POST   /pos/validate-vip?phone=
+ * POST   /pos/transactions
+ * GET    /pos/transactions/{id}
+ * GET    /pos/products
+ * GET    /finance/summary?period=&date_from=&date_to=
+ * GET    /dashboard/overview?date=
+ * GET    /audit/logs | /audit/logs/{id}
+ * GET    /warranty/lookup?invoice_no=
+ * POST   /warranty/claims
  */
 
 import apiClient from "./axios";
-import type {
-  LoginRequest,
-  LoginResponse,
-  Product,
-  CreateProductRequest,
-  Member,
-  CheckoutRequest,
-  Transaction,
-  ReturnRequest,
-  FinancialReport,
-  AuditLog,
-} from "@/types";
 
-// ─── HELPERS ─────────────────────────────────────────────────────────────────
-
-type ApiOk<T> = { status: "success"; data: T };
-type ApiMsg  = { status: "success"; message: string };
+type ApiOk<T> = { success: boolean; data: T; message?: string };
+type ApiMsg   = { success: boolean; message: string };
 
 // ─── AUTH ────────────────────────────────────────────────────────────────────
 
 export const authApi = {
-  /** POST /auth/login — body: { email, password } */
-  login: (data: LoginRequest) =>
-    apiClient.post<ApiOk<LoginResponse>>("/auth/login", data).then((r) => r.data),
+  login: (data: { email: string; password: string }) =>
+    apiClient.post<ApiOk<{ token: string; user: Record<string, unknown> }>>("/auth/login", data).then((r) => r.data),
+
+  refresh: () =>
+    apiClient.post<ApiOk<{ token: string }>>("/auth/refresh").then((r) => r.data),
+
+  logout: () =>
+    apiClient.post<ApiMsg>("/auth/logout").then((r) => r.data),
 };
 
-// ─── INVENTORY / PRODUCTS ────────────────────────────────────────────────────
+// ─── INVENTORY ───────────────────────────────────────────────────────────────
 
 export const inventoryApi = {
-  /** GET /products?search=&low_stock= */
   getProducts: (params?: { search?: string; low_stock?: boolean }) =>
-    apiClient.get<ApiOk<Product[]>>("/products", { params }).then((r) => r.data),
+    apiClient.get("/inventory", { params }).then((r) => r.data),
 
-  /** POST /products */
-  createProduct: (data: CreateProductRequest) =>
-    apiClient.post<ApiOk<Product>>("/products", data).then((r) => r.data),
+  getProduct: (id: string) =>
+    apiClient.get(`/inventory/${id}`).then((r) => r.data),
 
-  /** PUT /products/bulk-update */
+  createProduct: (data: Record<string, unknown>) =>
+    apiClient.post("/inventory", data).then((r) => r.data),
+
+  updateProduct: (id: string, data: Record<string, unknown>) =>
+    apiClient.put(`/inventory/${id}`, data).then((r) => r.data),
+
+  deleteProduct: (id: string) =>
+    apiClient.delete(`/inventory/${id}`).then((r) => r.data),
+
   bulkUpdateStock: (updates: { id: string; new_stock: number }[]) =>
-    apiClient.put<ApiMsg>("/products/bulk-update", { updates }).then((r) => r.data),
+    apiClient.put("/inventory/bulk-update", { updates }).then((r) => r.data),
 };
 
-// ─── MEMBERS ─────────────────────────────────────────────────────────────────
+// ─── STAFF ───────────────────────────────────────────────────────────────────
 
-export const membersApi = {
-  /** GET /members/verify?phone=08xxx */
-  verifyMember: (phone: string) =>
-    apiClient.get<ApiOk<Member>>("/members/verify", { params: { phone } }).then((r) => r.data),
-};
-
-// ─── TRANSACTIONS ─────────────────────────────────────────────────────────────
-
-export const transactionsApi = {
-  /** POST /transactions/checkout */
-  checkout: (data: CheckoutRequest) =>
-    apiClient.post<ApiOk<Transaction>>("/transactions/checkout", data).then((r) => r.data),
-
-  /** POST /transactions/return */
-  returnProduct: (data: ReturnRequest) =>
-    apiClient.post<ApiMsg>("/transactions/return", data).then((r) => r.data),
-};
-
-// ─── REPORTS ─────────────────────────────────────────────────────────────────
-
-export const reportsApi = {
-  /** GET /reports/financial?start_date=&end_date= */
-  getFinancial: (params: { start_date: string; end_date: string }) =>
-    apiClient.get<ApiOk<FinancialReport>>("/reports/financial", { params }).then((r) => r.data),
-};
-
-// ─── AUDIT LOGS ───────────────────────────────────────────────────────────────
-
-export const auditApi = {
-  /** GET /audit-logs */
-  getLogs: () =>
-    apiClient.get<ApiOk<AuditLog[]>>("/audit-logs").then((r) => r.data),
-};
-
-// ─── EMPLOYEES ───────────────────────────────────────────────────────────────
-
-export interface EmployeePayload {
+export interface StaffPayload {
   name: string;
   email: string;
   password?: string;
   role: "CASHIER" | "OWNER";
 }
 
-export interface Employee {
+export interface Staff {
   id: string;
   name: string;
   email: string;
@@ -115,56 +77,117 @@ export interface Employee {
   is_active?: boolean;
 }
 
-export const employeesApi = {
-  /** GET /employees */
-  getList: () =>
-    apiClient.get<ApiOk<Employee[]>>("/employees").then((r) => r.data),
-
-  /** POST /employees */
-  create: (data: EmployeePayload) =>
-    apiClient.post<ApiOk<Employee>>("/employees", data).then((r) => r.data),
-
-  /** PUT /employees/:id */
-  update: (id: string, data: Partial<EmployeePayload>) =>
-    apiClient.put<ApiOk<Employee>>(`/employees/${id}`, data).then((r) => r.data),
-
-  /** DELETE /employees/:id */
-  delete: (id: string) =>
-    apiClient.delete<ApiMsg>(`/employees/${id}`).then((r) => r.data),
-};
-
-// ─── BACKWARD COMPAT (halaman lama / dashboard pakai mock) ───────────────────
-export const posApi = {
-  searchProducts: (params?: { q?: string }) =>
-    inventoryApi.getProducts({ search: params?.q }),
-  validateVip: (phone: string) =>
-    membersApi.verifyMember(phone),
-};
-
 export const staffApi = {
-  getList: () => employeesApi.getList(),
-  create:  (d: EmployeePayload) => employeesApi.create(d),
-  update:  (id: string, d: Partial<EmployeePayload>) => employeesApi.update(id, d),
-  delete:  (id: string) => employeesApi.delete(id),
-  toggleAccess: async (id: string) => {
-    // tidak ada endpoint toggle di real API — optimistic update saja
-    return { staff_id: id, is_active: true, message: "ok" };
-  },
+  getList: () =>
+    apiClient.get("/staff").then((r) => r.data),
+
+  getDetail: (id: string) =>
+    apiClient.get(`/staff/${id}`).then((r) => r.data),
+
+  create: (data: StaffPayload) =>
+    apiClient.post("/staff", data).then((r) => r.data),
+
+  update: (id: string, data: Partial<StaffPayload>) =>
+    apiClient.put(`/staff/${id}`, data).then((r) => r.data),
+
+  delete: (id: string) =>
+    apiClient.delete(`/staff/${id}`).then((r) => r.data),
+
+  toggleAccess: (id: string) =>
+    apiClient.patch(`/staff/${id}/toggle-access`).then((r) => r.data),
 };
 
-export const warrantyApi = {
-  lookup: async (_invoiceId: string) => {
-    // endpoint lookup tidak ada di real API, return null
-    throw new Error("INVOICE_NOT_FOUND");
-  },
-  claim: (data: ReturnRequest) => transactionsApi.returnProduct(data),
+// ─── MEMBERS VIP ─────────────────────────────────────────────────────────────
+
+export const membersApi = {
+  getList: () =>
+    apiClient.get("/members/vip").then((r) => r.data),
+
+  register: (data: { phone_number: string; name: string }) =>
+    apiClient.post("/members/vip", data).then((r) => r.data),
+
+  redeem: (member_id: string, data: Record<string, unknown>) =>
+    apiClient.post(`/members/vip/${member_id}/redeem`, data).then((r) => r.data),
 };
+
+// ─── POS ─────────────────────────────────────────────────────────────────────
+
+export const posApi = {
+  /** POST /pos/validate-vip?phone=08xxx */
+  validateVip: (phone: string) =>
+    apiClient.post("/pos/validate-vip", null, { params: { phone } }).then((r) => r.data),
+
+  /** GET /pos/products?search= */
+  getProducts: (params?: { search?: string }) =>
+    apiClient.get("/pos/products", { params }).then((r) => r.data),
+
+  /** POST /pos/transactions */
+  checkout: (data: {
+    member_id?: string | null;
+    discount_type: "PERCENTAGE" | "NOMINAL";
+    discount_value: number;
+    cash_paid: number;
+    items: { product_id: string; quantity: number }[];
+  }) =>
+    apiClient.post("/pos/transactions", data).then((r) => r.data),
+
+  /** GET /pos/transactions/{id} */
+  getTransaction: (id: string) =>
+    apiClient.get(`/pos/transactions/${id}`).then((r) => r.data),
+};
+
+// ─── FINANCE ─────────────────────────────────────────────────────────────────
+
+export const financeApi = {
+  /** GET /finance/summary?period=&date_from=&date_to= */
+  getSummary: (params: { period?: string; date_from?: string; date_to?: string }) =>
+    apiClient.get("/finance/summary", { params }).then((r) => r.data),
+};
+
+// ─── DASHBOARD ───────────────────────────────────────────────────────────────
 
 export const dashboardApi = {
-  getOverview: async () => {
-    // tidak ada endpoint dashboard — throw agar halaman pakai mock fallback
-    throw new Error("NO_ENDPOINT");
-  },
+  /** GET /dashboard/overview?date=YYYY-MM-DD */
+  getOverview: (date?: string) =>
+    apiClient.get("/dashboard/overview", { params: date ? { date } : {} }).then((r) => r.data),
 };
 
-export const financeApi = reportsApi;
+// ─── AUDIT LOGS ──────────────────────────────────────────────────────────────
+
+export const auditApi = {
+  getLogs: () =>
+    apiClient.get("/audit/logs").then((r) => r.data),
+
+  getLog: (id: string) =>
+    apiClient.get(`/audit/logs/${id}`).then((r) => r.data),
+};
+
+// ─── WARRANTY ────────────────────────────────────────────────────────────────
+
+export const warrantyApi = {
+  /** GET /warranty/lookup?invoice_no= */
+  lookup: (invoice_no: string) =>
+    apiClient.get("/warranty/lookup", { params: { invoice_no } }).then((r) => r.data),
+
+  /** POST /warranty/claims */
+  claim: (data: {
+    invoice_no: string;
+    product_id: string;
+    qty: number;
+    reason: "CACAT_PABRIK" | "SALAH_KIRIM" | "KUALITAS_TIDAK_SESUAI" | "LAINNYA";
+  }) =>
+    apiClient.post("/warranty/claims", data).then((r) => r.data),
+};
+
+// ─── BACKWARD COMPAT ─────────────────────────────────────────────────────────
+
+export const employeesApi = staffApi;
+export const transactionsApi = {
+  checkout: posApi.checkout,
+  returnProduct: warrantyApi.claim,
+};
+export const reportsApi = {
+  getFinancial: (params: { start_date: string; end_date: string }) =>
+    financeApi.getSummary({ date_from: params.start_date, date_to: params.end_date }),
+};
+export const inventoryApiLegacy = inventoryApi;

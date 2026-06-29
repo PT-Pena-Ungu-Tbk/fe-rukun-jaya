@@ -1,17 +1,19 @@
 import { cn } from "@/lib/utils";
-import type { Product, StockStatus } from "@/types";
+import type { Product } from "@/types";
 import { getStockStatus } from "@/types";
+
+type DisplayStatus = "In Stock" | "Low Stock" | "Out of Stock";
 
 interface StockBadgeProps {
   product?: Product;
-  status?: StockStatus;
+  status?: DisplayStatus;
   className?: string;
 }
 
 export default function StockBadge({ product, status, className }: StockBadgeProps) {
-  const s = status ?? (product ? getStockStatus(product) : "In Stock");
+  const s: DisplayStatus = status ?? (product ? getStockStatus(product) : "In Stock");
 
-  const styles: Record<StockStatus, string> = {
+  const styles: Record<DisplayStatus, string> = {
     "In Stock": "bg-green-100 text-green-700",
     "Low Stock": "bg-amber-100 text-amber-700",
     "Out of Stock": "bg-red-100 text-red-700",

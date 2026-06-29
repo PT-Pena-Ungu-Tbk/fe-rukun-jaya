@@ -1,46 +1,107 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import TopNav from "@/components/layout/TopNav";
-import { Download, TrendingUp } from "lucide-react";
+import { Download, TrendingUp, Loader2 } from "lucide-react";
 import { formatRupiah } from "@/lib/utils";
+import { financeApi } from "@/lib/api";
 
-const mockTransactions = [
-  { id: "TRÚ-88291", tanggal: "24 Okt 2023, 14:30", pelanggan: "PT. Bangun Perkasa", metode: "Transfer Bank (BCA)", total: 45000000, status: "Sukses" },
-  { id: "TRÚ-88290", tanggal: "24 Okt 2023, 11:15", pelanggan: "Toko Besi Maju Jaya", metode: "Giro", total: 12500000, status: "Sukses" },
-  { id: "TRÚ-88289", tanggal: "23 Okt 2023, 09:45", pelanggan: "CV. Makmur Abadi", metode: "Transfer Bank (Mandiri)", total: 8750000, status: "Sukses" },
-  { id: "TRÚ-88288", tanggal: "22 Okt 2023, 16:20", pelanggan: "Bpk. Budi Santoso", metode: "Tunai", total: 2100000, status: "Sukses" },
-  { id: "TRÚ-88287", tanggal: "22 Okt 2023, 10:05", pelanggan: "PT. Konstruksi Indah", metode: "Transfer Bank (BRI)", total: 120000000, status: "Sukses" },
-];
+// Helpers
+function toDateStr(d: Date) {
+  return d.toISOString().split("T")[0]; // YYYY-MM-DD
+}
+function firstOfMonth(d: Date) {
+  return new Date(d.getFullYear(), d.getMonth(), 1);
+}
+function lastOfMonth(d: Date) {
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0);
+}
 
-const periods = ["Bulan Ini (Okt 2023)", "Bulan Lalu", "Custom"];
+interface TopProduct {
+  product_id: string;
+  sku_code: string;
+  name: string;
+  quantity_sold: number;
+  revenue: number;
+}
 
 export default function FinancialReportsPage() {
-  const [period, setPeriod] = useState(periods[0]);
-  const [search, setSearch] = useState("");
+  const now = new Date();
+  const [startDate, setStartDate] = useState(toDateStr(firstOfMonth(now)));
+  const [endDate, setEndDate]     = useState(toDateStr(lastOfMonth(now)));
+  const [search, setSearch]       = useState("");
+  const [loading, setLoading]     = useState(false);
 
-  const filtered = mockTransactions.filter((t) =>
-    t.pelanggan.toLowerCase().includes(search.toLowerCase()) || t.id.includes(search)
+  const [totalRevenue, setTotalRevenue]   = useState<number | null>(null);
+  const [txCount, setTxCount]             = useState<number | null>(null);
+  const [topProducts, setTopProducts]     = useState<TopProduct[]>([]);
+
+  const fetchReport = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await financeApi.getSummary({ date_from: startDate, date_to: endDate });
+      // res = { status, data: { total_revenue, total_profit, transaction_count, data: [...] } }
+      // res = { status, data: { period, total_revenue, successful_transactions, top_products } }
+      const payload = res as Record<string, unknown>;
+      const d = (payload.data ?? payload) as Record<string, unknown>;
+
+      setTotalRevenue(Number(d.total_revenue ?? 0));
+      setTxCount(Number(d.successful_transactions ?? d.transaction_count ?? 0));
+      setTopProducts((d.top_products ?? []) as TopProduct[]);
+    } catch (_e) {
+      // keep empty
+    } finally {
+      setLoading(false);
+    }
+  }, [startDate, endDate]);
+
+  useEffect(() => { fetchReport(); }, [fetchReport]);
+
+  const filtered = topProducts.filter(
+    (p) => p.name.toLowerCase().includes(search.toLowerCase()) || p.sku_code.includes(search)
   );
+
+  const displayRevenue = totalRevenue ?? 0;
+  const displayCount   = txCount ?? 0;
 
   return (
     <div className="flex-1 flex flex-col min-h-screen">
       <TopNav />
       <main className="flex-1 p-6 animate-fade-in">
+        {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Laporan Keuangan</h1>
             <p className="text-sm text-gray-500 mt-0.5">Ringkasan performa finansial dan riwayat transaksi.</p>
           </div>
           <div className="flex items-center gap-2">
-            <select value={period} onChange={(e) => setPeriod(e.target.value)}
-              className="form-select text-sm py-2">
-              {periods.map((p) => <option key={p}>{p}</option>)}
-            </select>
-            <button className="btn-secondary text-sm"><Download size={14} /> Unduh Laporan (PDF)</button>
+            {/* Date range */}
+            <label className="text-sm text-gray-500">Dari</label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="form-input text-sm py-2 w-36"
+            />
+            <label className="text-sm text-gray-500">s/d</label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="form-input text-sm py-2 w-36"
+            />
+            <button
+              onClick={fetchReport}
+              disabled={loading}
+              className="btn-primary text-sm py-2"
+            >
+              {loading ? <Loader2 size={14} className="animate-spin" /> : "Tampilkan"}
+            </button>
+            <button className="btn-secondary text-sm"><Download size={14} /> Unduh PDF</button>
           </div>
         </div>
 
+        {/* Summary cards */}
         <div className="grid grid-cols-2 gap-4 mb-5 animate-slide-up">
           <div className="stat-card">
             <div className="flex items-center gap-2 mb-3">
@@ -49,60 +110,85 @@ export default function FinancialReportsPage() {
               </div>
               <p className="text-sm font-semibold text-gray-600">Total Omzet</p>
             </div>
-            <p className="text-4xl font-bold text-gray-900">{formatRupiah(1245000000)}</p>
+            {loading ? (
+              <div className="h-10 bg-gray-100 rounded animate-pulse" />
+            ) : (
+              <p className="text-3xl font-bold text-gray-900">{formatRupiah(displayRevenue)}</p>
+            )}
             <div className="flex items-center gap-1 mt-2 text-green-600 text-sm font-medium">
-              <TrendingUp size={15} /> +12.5% vs Bulan Lalu
+              <TrendingUp size={15} /> Periode terpilih
             </div>
           </div>
+
           <div className="stat-card">
             <div className="flex items-center gap-2 mb-3">
-              <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                <span className="text-green-600 text-sm">💰</span>
+              <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                <span className="text-purple-600 text-sm">🧾</span>
               </div>
-              <p className="text-sm font-semibold text-gray-600">Keuntungan Bersih</p>
+              <p className="text-sm font-semibold text-gray-600">Transaksi Berhasil</p>
             </div>
-            <p className="text-4xl font-bold text-gray-900">{formatRupiah(311250000)}</p>
-            <div className="flex items-center gap-1 mt-2 text-green-600 text-sm font-medium">
-              <TrendingUp size={15} /> +8.2% vs Bulan Lalu
+            {loading ? (
+              <div className="h-10 bg-gray-100 rounded animate-pulse" />
+            ) : (
+              <p className="text-3xl font-bold text-gray-900">{displayCount}</p>
+            )}
+            <div className="flex items-center gap-1 mt-2 text-gray-400 text-sm">
+              Periode terpilih
             </div>
           </div>
         </div>
 
+        {/* Table */}
         <div className="page-card animate-slide-up stagger-2">
           <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-            <h3 className="font-semibold text-gray-800">Riwayat Transaksi Sukses</h3>
-            <input value={search} onChange={(e) => setSearch(e.target.value)}
-              placeholder="Cari ID Transaksi..." className="form-input text-sm py-2 w-52" />
+            <h3 className="font-semibold text-gray-800">Produk Terlaris</h3>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Cari produk / SKU..."
+              className="form-input text-sm py-2 w-52"
+            />
           </div>
           <div className="overflow-x-auto">
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>ID Transaksi</th><th>Tanggal & Waktu</th><th>Pelanggan</th>
-                  <th>Metode Pembayaran</th><th>Total Transaksi</th><th>Status</th>
+                  <th>#</th>
+                  <th>SKU</th>
+                  <th>Nama Produk</th>
+                  <th>Qty Terjual</th>
+                  <th>Revenue</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((t) => (
-                  <tr key={t.id} className="animate-fade-in">
-                    <td className="font-mono text-sm font-semibold text-gray-700">{t.id}</td>
-                    <td className="text-gray-600 text-sm">{t.tanggal}</td>
-                    <td className="font-medium text-gray-800">{t.pelanggan}</td>
-                    <td className="text-gray-600 text-sm">{t.metode}</td>
-                    <td className="font-semibold text-gray-900">{formatRupiah(t.total)}</td>
-                    <td><span className="badge-success">{t.status}</span></td>
+                {loading && (
+                  <tr>
+                    <td colSpan={5} className="text-center py-12 text-gray-400">
+                      <Loader2 size={20} className="animate-spin inline mr-2" /> Memuat data...
+                    </td>
+                  </tr>
+                )}
+                {!loading && filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="text-center py-12 text-gray-400 text-sm">
+                      Tidak ada data pada periode ini.
+                    </td>
+                  </tr>
+                )}
+                {!loading && filtered.map((p, idx) => (
+                  <tr key={p.product_id} className="animate-fade-in">
+                    <td className="text-gray-400 text-sm">{idx + 1}</td>
+                    <td className="font-mono text-sm text-gray-600">{p.sku_code}</td>
+                    <td className="font-medium text-gray-800">{p.name}</td>
+                    <td className="text-gray-700">{p.quantity_sold} pcs</td>
+                    <td className="font-semibold text-gray-900">{formatRupiah(p.revenue)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 text-sm text-gray-500">
-            <span>Menampilkan 1-{filtered.length} dari 142 transaksi</span>
-            <div className="flex items-center gap-1">
-              {[1, 2, 3, "›"].map((p, i) => (
-                <button key={i} className={`w-7 h-7 rounded text-xs ${p === 1 ? "bg-blue-600 text-white" : "hover:bg-gray-100 text-gray-600"}`}>{p}</button>
-              ))}
-            </div>
+          <div className="px-5 py-3 border-t border-gray-100 text-sm text-gray-500">
+            {filtered.length} produk
           </div>
         </div>
       </main>

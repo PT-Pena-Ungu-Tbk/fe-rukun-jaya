@@ -82,8 +82,9 @@ const toAktivitas = (a: string): AuditEntry["aktivitas"] => {
 export default function AuditLogPage() {
   const [jenisFilter, setJenisFilter] = useState("Semua Aktivitas");
   const [dateRange] = useState("01 Okt 2023 - 07 Okt 2023");
-  const [logs, setLogs] = useState<AuditEntry[]>(mockLogs);
-  const [totalItems, setTotalItems] = useState(128);
+  const [logs, setLogs] = useState<AuditEntry[]>([]);
+  const [totalItems, setTotalItems] = useState(0);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     auditApi.getLogs()
@@ -104,10 +105,11 @@ export default function AuditLogPage() {
           nilai_lama: item.nilai_lama ? String(item.nilai_lama) : undefined,
           nilai_baru: item.nilai_baru ? String(item.nilai_baru) : undefined,
         }));
-        if (mapped.length > 0) setLogs(mapped);
+        setLogs(mapped);
         setTotalItems(items.length);
+        setLoaded(true);
       })
-      .catch(() => { /* keep mock */ });
+      .catch(() => { setLoaded(true); });
   }, []);
 
   const filtered = logs.filter((l) =>
@@ -176,6 +178,13 @@ export default function AuditLogPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
+              {loaded && filtered.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="px-5 py-16 text-center text-gray-400 text-sm">
+                    Belum ada aktivitas yang tercatat.
+                  </td>
+                </tr>
+              )}
               {filtered.map((log) => {
                 const config = activityConfig[log.aktivitas];
                 return (

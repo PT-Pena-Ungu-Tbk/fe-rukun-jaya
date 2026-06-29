@@ -19,7 +19,7 @@ export default function StockAlertsPage() {
     queryFn: () => inventoryApi.getProducts({ low_stock: true }),
   });
 
-  const products = data?.data ?? mockProducts;
+  const products: import("@/types").Product[] = (data?.data ?? mockProducts) as import("@/types").Product[];
   const lowStockItems = products.filter((p) => getStockStatus(p) !== "In Stock");
   const outOfStock = products.filter((p) => p.current_stock === 0);
   const belowMin = products.filter(
@@ -43,7 +43,7 @@ export default function StockAlertsPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <TopNav title="Stock Alerts & Replenishment" showSearch={false} />
+      <TopNav title="Stock Alerts & Replenishment" />
       <div className="p-6 overflow-auto">
         {/* Header */}
         <div className="mb-6">

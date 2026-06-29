@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import TopNav from "@/components/layout/TopNav";
 import { Plus, Download, Gift, MoreVertical, X, Loader2, Users, UserCheck, Star } from "lucide-react";
 import toast from "react-hot-toast";
+import { membersApi } from "@/lib/api";
 import type { VipMember } from "@/types";
 
 type Member = VipMember;
@@ -33,8 +34,26 @@ export default function MembersPage() {
   const [form, setForm] = useState({ nama: "", phone_number: "", level: "Bronze", poin_awal: 0 });
   const [saving, setSaving] = useState(false);
 
-  // Members endpoint belum ada di real API (hanya /members/verify ada)
-  // → pakai mock data, tambah secara lokal
+  useEffect(() => {
+    membersApi.getList()
+      .then((res) => {
+        const payload = res as Record<string, unknown>;
+        const list = Array.isArray(payload.data) ? payload.data : Array.isArray(res) ? res : [];
+        if (list.length > 0) {
+          const mapped = list.map((m: Record<string, unknown>, i: number) => ({
+            member_id: String(m.id ?? m.member_id ?? `#VIP-${i}`),
+            nama: String(m.name ?? m.nama ?? ""),
+            phone_number: String(m.phone_number ?? ""),
+            level: (String(m.level ?? m.tier ?? "Bronze")) as "Gold" | "Silver" | "Bronze",
+            poin: Number(m.points ?? m.poin ?? 0),
+            join_date: String(m.created_at ?? m.join_date ?? "").split("T")[0],
+            last_transaction: String(m.last_transaction ?? "-"),
+          }));
+          setMembers(mapped);
+        }
+      })
+      .catch(() => { /* keep mock */ });
+  }, []);
 
   const filtered = members.filter((m) => {
     const matchSearch = m.nama.toLowerCase().includes(search.toLowerCase()) || m.phone_number.includes(search);
@@ -49,23 +68,40 @@ export default function MembersPage() {
   };
 
   const handleSave = async () => {
+    if (!form.nama || !form.phone_number) { toast.error("Nama dan nomor HP wajib diisi"); return; }
     setSaving(true);
     try {
-      const newMember: Member = {
-        member_id: `#VIP-${String(Math.floor(1000 + Math.random() * 9000))}`,
-        nama: form.nama,
-        phone_number: form.phone_number,
-        level: form.level as "Gold" | "Silver" | "Bronze",
-        poin: form.poin_awal,
-        join_date: new Date().toISOString().split("T")[0],
-        last_transaction: "-",
-      };
-      setMembers((prev) => [...prev, newMember]);
+      await membersApi.register({ phone_number: form.phone_number, name: form.nama });
+      // Reload list after register
+      const res = await membersApi.getList();
+      const payload = res as Record<string, unknown>;
+      const list = Array.isArray(payload.data) ? payload.data : [];
+      if (list.length > 0) {
+        const mapped = list.map((m: Record<string, unknown>, i: number) => ({
+          member_id: String(m.id ?? m.member_id ?? `#VIP-${i}`),
+          nama: String(m.name ?? m.nama ?? ""),
+          phone_number: String(m.phone_number ?? ""),
+          level: (String(m.level ?? m.tier ?? "Bronze")) as "Gold" | "Silver" | "Bronze",
+          poin: Number(m.points ?? m.poin ?? 0),
+          join_date: String(m.created_at ?? m.join_date ?? "").split("T")[0],
+          last_transaction: String(m.last_transaction ?? "-"),
+        }));
+        setMembers(mapped);
+      } else {
+        // Optimistic fallback
+        setMembers((prev) => [...prev, {
+          member_id: `#VIP-${String(Math.floor(1000 + Math.random() * 9000))}`,
+          nama: form.nama, phone_number: form.phone_number,
+          level: form.level as "Gold" | "Silver" | "Bronze",
+          poin: form.poin_awal, join_date: new Date().toISOString().split("T")[0], last_transaction: "-",
+        }]);
+      }
       toast.success("Member VIP berhasil ditambahkan!");
       setShowAddModal(false);
       setForm({ nama: "", phone_number: "", level: "Bronze", poin_awal: 0 });
-    } catch {
-      toast.error("Gagal menambahkan member");
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(msg ?? "Gagal menambahkan member");
     } finally {
       setSaving(false);
     }

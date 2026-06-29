@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import TopNav from "@/components/layout/TopNav";
 import { Plus, Pencil, Trash2, X, Loader2, AlertTriangle } from "lucide-react";
 import toast from "react-hot-toast";
-import { employeesApi, type Employee } from "@/lib/api";
+import { staffApi, type Staff as StaffType } from "@/lib/api";
 
 interface Staff {
   id: string; employee_id: string; full_name: string;
@@ -12,7 +12,7 @@ interface Staff {
   email?: string;
 }
 
-const toStaff = (e: Employee): Staff => ({
+const toStaff = (e: StaffType): Staff => ({
   id: e.id,
   employee_id: e.id,
   full_name: e.name,
@@ -49,8 +49,11 @@ export default function UserManagementPage() {
   const [showPass, setShowPass] = useState(false);
 
   useEffect(() => {
-    employeesApi.getList()
-      .then((res) => setStaff(res.data.map(toStaff)))
+    staffApi.getList()
+      .then((res) => {
+        const list = (res as Record<string, unknown>).data ?? res;
+        if (Array.isArray(list)) setStaff((list as StaffType[]).map(toStaff));
+      })
       .catch(() => { /* keep mock */ });
   }, []);
 
@@ -58,22 +61,30 @@ export default function UserManagementPage() {
     s.full_name.toLowerCase().includes(search.toLowerCase()) || s.employee_id.includes(search)
   );
 
-  const toggleAccess = (id: string) => {
-    // tidak ada endpoint toggle — optimistic UI update
+  const toggleAccess = async (id: string) => {
+    // Optimistic update
     setStaff((prev) => prev.map((s) => s.id === id ? { ...s, is_active: !s.is_active } : s));
-    toast.success("Status akses diperbarui");
+    try {
+      await staffApi.toggleAccess(id);
+      toast.success("Status akses diperbarui");
+    } catch (_e) {
+      // Revert on failure
+      setStaff((prev) => prev.map((s) => s.id === id ? { ...s, is_active: !s.is_active } : s));
+      toast.error("Gagal mengubah status akses");
+    }
   };
 
   const handleAdd = async () => {
     setSaving(true);
     try {
-      const created = await employeesApi.create({
+      const res = await staffApi.create({
         name: newForm.full_name,
         role: newForm.role as "CASHIER" | "OWNER",
         email: newForm.email,
         password: newForm.password,
       });
-      setStaff((prev) => [...prev, toStaff(created.data)]);
+      const created = (res as Record<string, unknown>).data ?? res;
+      setStaff((prev) => [...prev, toStaff(created as StaffType)]);
       toast.success("Karyawan berhasil ditambahkan!");
       setShowAddModal(false);
       setNewForm({ full_name: "", role: "CASHIER", phone_number: "", email: "", password: "" });
@@ -89,11 +100,11 @@ export default function UserManagementPage() {
     if (!editStaff) return;
     setSaving(true);
     try {
-      await employeesApi.update(editStaff.id, { name: editStaff.full_name });
+      await staffApi.update(editStaff.id, { name: editStaff.full_name });
       setStaff((prev) => prev.map((s) => s.id === editStaff.id ? editStaff : s));
       toast.success("Data karyawan diperbarui!");
       setEditStaff(null);
-    } catch {
+    } catch (_e) {
       toast.error("Gagal memperbarui karyawan");
     } finally {
       setSaving(false);
@@ -103,11 +114,11 @@ export default function UserManagementPage() {
   const handleDelete = async () => {
     if (!deleteStaff) return;
     try {
-      await employeesApi.delete(deleteStaff.id);
+      await staffApi.delete(deleteStaff.id);
       setStaff((prev) => prev.filter((s) => s.id !== deleteStaff.id));
       toast.success("Karyawan dihapus");
       setDeleteStaff(null);
-    } catch {
+    } catch (_e) {
       toast.error("Gagal menghapus karyawan");
     }
   };

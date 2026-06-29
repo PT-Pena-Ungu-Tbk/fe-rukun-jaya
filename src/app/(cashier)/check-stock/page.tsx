@@ -15,7 +15,7 @@ export default function CheckStockPage() {
     queryFn: () => inventoryApi.getProducts({ search }),
   });
 
-  const products = data?.data ?? mockProducts;
+  const products: import("@/types").Product[] = (data?.data ?? mockProducts) as import("@/types").Product[];
 
   return (
     <div className="flex flex-col h-full">
