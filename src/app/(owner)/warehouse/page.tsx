@@ -5,6 +5,7 @@ import { formatRupiah } from "@/lib/utils";
 import { Warehouse, Zap, TrendingUp, ArrowDown, ArrowUp, RefreshCw, AlertTriangle } from "lucide-react";
 import Badge from "@/components/ui/Badge";
 import { cn } from "@/lib/utils";
+import { mockStorageZones } from "@/lib/mockData";
 
 const WORKFLOW = [
   { label: "Inbound Receiving", done: true },
@@ -78,8 +79,8 @@ export default function WarehousePage() {
               <div key={step.label} className="flex items-center gap-3">
                 <div className="flex flex-col items-center gap-1.5">
                   <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${step.done ? "bg-green-500 text-white" :
-                      step.active ? "bg-blue-600 text-white" :
-                        "bg-slate-100 text-slate-400"
+                    step.active ? "bg-blue-600 text-white" :
+                      "bg-slate-100 text-slate-400"
                     }`}>
                     <Warehouse className="w-4 h-4" />
                   </div>
@@ -113,7 +114,7 @@ export default function WarehousePage() {
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-xs text-slate-500">Capacity</span>
                   <span className={`text-sm font-bold ${zone.capacity_percentage >= 85 ? "text-red-600" :
-                      zone.capacity_percentage >= 60 ? "text-amber-600" : "text-blue-600"
+                    zone.capacity_percentage >= 60 ? "text-amber-600" : "text-blue-600"
                     }`}>
                     {zone.capacity_percentage}%
                   </span>
