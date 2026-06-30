@@ -4,6 +4,7 @@ import TopNav from "@/components/layout/TopNav";
 import { formatRupiah } from "@/lib/utils";
 import { Building, Package, ShoppingCart, Star, Plus, Check, ChevronRight, ChevronLeft, AlertTriangle } from "lucide-react";
 import Badge from "@/components/ui/Badge";
+import { mockSuppliers } from "@/lib/mockData";
 
 function StarRating({ rating }: { rating: number }) {
   return (

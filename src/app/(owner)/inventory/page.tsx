@@ -39,7 +39,6 @@ export default function InventoryPage() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [summary, setSummary] = useState({ stok_habis: 0, di_bawah_minimum: 0, akan_expired: 0 });
 
   useEffect(() => {
     setLoading(true);
@@ -65,9 +64,9 @@ export default function InventoryPage() {
   });
 
   const localSummary = {
-    stokHabis: summary.stok_habis || items.filter((i) => i.current_stock === 0).length,
-    dibawahMin: summary.di_bawah_minimum || items.filter((i) => i.current_stock > 0 && i.current_stock <= i.min_stock).length,
-    akanExpired: summary.akan_expired || 0,
+    stokHabis: items.filter((i) => i.current_stock === 0).length,
+    dibawahMin: items.filter((i) => i.current_stock > 0 && i.current_stock <= i.min_stock).length,
+    akanExpired: 0,
   };
 
   const handleSave = async () => {

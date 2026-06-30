@@ -30,6 +30,7 @@ import type {
   CheckoutRequest,
   Transaction,
   ReturnRequest,
+  TransactionHistory,
   FinancialReport,
   FinanceSummary,
   AuditLog,
@@ -121,6 +122,16 @@ export const transactionsApi = {
     };
     return apiClient.post<ApiOk<Transaction>>("/pos/transactions", payload).then((r) => r.data);
   },
+
+  /** GET /transactions */
+  getTransactions: (params?: {
+    payment_method?: string;
+    status?: string;
+    cashier_id?: string;
+    date_from?: string;
+    date_to?: string;
+  }) =>
+    apiClient.get<ApiOk<TransactionHistory[]>>("/transactions", { params }).then((r) => r.data),
 
   /** GET /pos/transactions/:transaction_id */
   getTransaction: (transactionId: string) =>
