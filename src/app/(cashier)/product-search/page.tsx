@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { inventoryApi } from "@/lib/api";
-import { mockProducts } from "@/lib/mockData";
 import StockBadge from "@/components/ui/StockBadge";
 import { formatRupiah } from "@/lib/utils";
 import { Search } from "lucide-react";
@@ -16,7 +15,7 @@ export default function ProductSearchPage() {
     queryFn: () => inventoryApi.getProducts({ search }),
   });
 
-  const products = data?.data ?? mockProducts;
+  const products = data?.data ?? [];
 
   return (
     <div className="flex flex-col h-full">
@@ -49,7 +48,9 @@ export default function ProductSearchPage() {
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={7} className="text-center py-8 text-slate-400">Loading...</td></tr>
+                <tr><td colSpan={7} className="text-center py-8 text-slate-400">Memuat data produk...</td></tr>
+              ) : products.length === 0 ? (
+                <tr><td colSpan={7} className="text-center py-8 text-slate-400">Tidak ada produk ditemukan.</td></tr>
               ) : (
                 products.map((p) => (
                   <tr key={p.id}>

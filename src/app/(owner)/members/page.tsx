@@ -2,58 +2,57 @@
 
 import { useState, useEffect } from "react";
 import TopNav from "@/components/layout/TopNav";
-import { Plus, Download, Gift, MoreVertical, X, Loader2, Users, UserCheck, Star } from "lucide-react";
+import { Plus, MoreVertical, X, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 import type { VipMember } from "@/types";
 import { membersApi } from "@/lib/api";
 
 type Member = VipMember;
 
-const MOCK_MEMBERS: Member[] = [
-  { member_id: "#VIP-0892", nama: "Budi Santoso", phone_number: "0812-3456-7890", level: "Gold", poin: 2450, join_date: "2023-01-12", last_transaction: "2 days ago" },
-  { member_id: "#VIP-0901", nama: "Siti Rahmawati", phone_number: "0856-7890-1234", level: "Silver", poin: 840, join_date: "2023-03-05", last_transaction: "1 week ago" },
-  { member_id: "#VIP-0955", nama: "Agus Wijaya", phone_number: "0899-1122-3344", level: "Bronze", poin: 120, join_date: "2023-08-22", last_transaction: "3 weeks ago" },
-  { member_id: "#VIP-1022", nama: "CV. Bangun Sentosa", phone_number: "0811-2233-4455", level: "Gold", poin: 5100, join_date: "2022-02-10", last_transaction: "Today" },
-];
-
-const levelBadge = (l: string) => {
-  const style: Record<string, string> = {
-    Gold: "bg-yellow-100 text-yellow-700",
-    Silver: "bg-gray-100 text-gray-600",
-    Bronze: "bg-orange-100 text-orange-700",
-  };
-  return <span className={`px-2.5 py-0.5 text-xs font-bold rounded-full ${style[l] ?? ""}`}>{l}</span>;
-};
-
 export default function MembersPage() {
-  const [members, setMembers] = useState<Member[]>(MOCK_MEMBERS);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterLevel, setFilterLevel] = useState("All Levels");
   const [showAddModal, setShowAddModal] = useState(false);
-  const [showRedeem, setShowRedeem] = useState(false);
   const [form, setForm] = useState({ nama: "", phone_number: "", level: "Bronze", poin_awal: 0 });
   const [saving, setSaving] = useState(false);
-  const [apiStats, setApiStats] = useState<{ total_members: number; active_members: number; total_poin_issued: number } | null>(null);
 
-  useEffect(() => {
+  const fetchMembers = () => {
+    setLoading(true);
     membersApi.getVipMembers({ limit: 100 })
       .then((res) => {
-        setMembers(res.items);
-        setApiStats(res.stats);
+        setMembers(res?.items || []);
       })
-      .catch(() => { /* keep mock */ });
+      .catch((err) => {
+        console.error(err);
+        toast.error("Gagal memuat daftar member VIP");
+        setMembers([]);
+      })
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchMembers();
   }, []);
 
   const filtered = members.filter((m) => {
-    const matchSearch = m.nama.toLowerCase().includes(search.toLowerCase()) || m.phone_number.includes(search);
+    const namaMatch = m.nama ? m.nama.toLowerCase().includes(search.toLowerCase()) : false;
+    const phoneMatch = m.phone_number ? m.phone_number.includes(search) : false;
+    const matchSearch = namaMatch || phoneMatch;
     const matchLevel = filterLevel === "All Levels" || m.level === filterLevel;
     return matchSearch && matchLevel;
   });
 
-  const stats = {
-    total: apiStats?.total_members ?? members.length,
-    active: apiStats?.active_members ?? members.filter((m) => m.last_transaction !== "").length,
-    totalPoin: apiStats?.total_poin_issued ?? members.reduce((s, m) => s + m.poin, 0),
+
+
+  const levelBadge = (l: string) => {
+    const styles: Record<string, string> = {
+      Gold: "bg-amber-100 text-amber-700 border border-amber-200",
+      Silver: "bg-slate-100 text-slate-700 border border-slate-200",
+      Bronze: "bg-orange-100 text-orange-700 border border-orange-200",
+    };
+    return <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${styles[l] ?? "bg-gray-100 text-gray-700"}`}>{l}</span>;
   };
 
   const handleSave = async () => {
@@ -73,6 +72,7 @@ export default function MembersPage() {
       toast.success("Member VIP berhasil ditambahkan!");
       setShowAddModal(false);
       setForm({ nama: "", phone_number: "", level: "Bronze", poin_awal: 0 });
+      fetchMembers();
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
       toast.error(msg ?? "Gagal menambahkan member");
@@ -80,6 +80,8 @@ export default function MembersPage() {
       setSaving(false);
     }
   };
+
+
 
   return (
     <div className="flex-1 flex flex-col min-h-screen">
@@ -92,32 +94,8 @@ export default function MembersPage() {
             <p className="text-sm text-gray-500 mt-0.5">Overview and administration of loyalty program members.</p>
           </div>
           <div className="flex items-center gap-2">
-            <button className="btn-secondary text-sm"><Download size={15} /> Export List</button>
-            <button onClick={() => setShowRedeem(true)} className="btn-secondary text-sm"><Gift size={15} /> Redeem Points</button>
             <button onClick={() => setShowAddModal(true)} className="btn-primary text-sm"><Plus size={15} /> Tambah Member Baru</button>
           </div>
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-4 mb-5 animate-slide-up">
-          {[
-            { label: "Total Members", value: stats.total.toLocaleString("id-ID"), sub: "↑12% vs last month", icon: Users, color: "blue" },
-            { label: "Active Members", value: stats.active.toString(), sub: "71% engagement rate", icon: UserCheck, color: "green" },
-            { label: "Total Points Issued", value: `${(stats.totalPoin / 1000).toFixed(1)}k`, sub: "↑5.4k this week", icon: Star, color: "orange" },
-          ].map((s, i) => (
-            <div key={i} className={`stat-card flex items-center gap-4 stagger-${i + 1}`}>
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                s.color === "blue" ? "bg-blue-100" : s.color === "green" ? "bg-green-100" : "bg-orange-100"}`}>
-                <s.icon size={20} className={
-                  s.color === "blue" ? "text-blue-600" : s.color === "green" ? "text-green-600" : "text-orange-600"} />
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{s.label}</p>
-                <p className="text-2xl font-bold text-gray-900">{s.value}</p>
-                <p className="text-xs text-green-600">{s.sub}</p>
-              </div>
-            </div>
-          ))}
         </div>
 
         {/* Table */}
@@ -146,22 +124,41 @@ export default function MembersPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((m) => (
-                  <tr key={m.member_id} className="animate-fade-in">
-                    <td className="font-mono text-sm font-semibold text-gray-700">{m.member_id}</td>
-                    <td className="font-medium text-gray-900">{m.nama}</td>
-                    <td className="text-gray-600 text-sm">{m.phone_number}</td>
-                    <td>{levelBadge(m.level)}</td>
-                    <td className="font-semibold text-gray-800">{m.poin.toLocaleString("id-ID")}</td>
-                    <td className="text-gray-500 text-sm">{new Date(m.join_date).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}</td>
-                    <td className="text-gray-500 text-sm">{m.last_transaction}</td>
-                    <td>
-                      <button className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors">
-                        <MoreVertical size={15} />
-                      </button>
+                {loading ? (
+                  <tr>
+                    <td colSpan={8} className="text-center py-8">
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <Loader2 className="animate-spin text-blue-600" size={24} />
+                        <span className="text-sm text-gray-500">Memuat data member...</span>
+                      </div>
                     </td>
                   </tr>
-                ))}
+                ) : filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="text-center py-8 text-sm text-gray-400">
+                      Belum ada member VIP terdaftar.
+                    </td>
+                  </tr>
+                ) : (
+                  filtered.map((m) => (
+                    <tr key={m.member_id} className="animate-fade-in">
+                      <td className="font-mono text-sm font-semibold text-gray-700">{m.member_id}</td>
+                      <td className="font-medium text-gray-900">{m.nama}</td>
+                      <td className="text-gray-600 text-sm">{m.phone_number}</td>
+                      <td>{levelBadge(m.level)}</td>
+                      <td className="font-semibold text-gray-800">{(m.poin || 0).toLocaleString("id-ID")}</td>
+                      <td className="text-gray-500 text-sm">
+                        {m.join_date ? new Date(m.join_date).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) : "-"}
+                      </td>
+                      <td className="text-gray-500 text-sm">{m.last_transaction || "-"}</td>
+                      <td>
+                        <button className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors">
+                          <MoreVertical size={15} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -220,6 +217,8 @@ export default function MembersPage() {
           </div>
         </div>
       )}
+
+
     </div>
   );
 }

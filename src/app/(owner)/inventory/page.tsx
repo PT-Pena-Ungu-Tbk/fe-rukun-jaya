@@ -12,15 +12,6 @@ import type { Product } from "@/types";
 
 type InventoryItem = Product & { _displayStok?: number };
 
-const MOCK_ITEMS: InventoryItem[] = [
-  { id: "INV-001", sku_code: "SMN-TR50", name: "Semen Tiga Roda 50kg", category: "Semen", supplier: "-", buy_price: "48000", sell_price: "55000", current_stock: 145, defective_stock: 0, min_stock: 30, rack_location: "A1-R01" },
-  { id: "INV-089", sku_code: "PKB-5CM", name: "Paku Beton 5cm", category: "Paku", supplier: "-", buy_price: "12000", sell_price: "15000", current_stock: 0, defective_stock: 0, min_stock: 20, rack_location: "C3-R12" },
-  { id: "INV-042", sku_code: "CAT-DLX5", name: "Cat Tembok Dulux Putih 5kg", category: "Cat", supplier: "-", buy_price: "115000", sell_price: "135000", current_stock: 24, defective_stock: 0, min_stock: 10, rack_location: "B2-R05" },
-  { id: "INV-112", sku_code: "PPA-WAV12", name: "Pipa PVC Wavin 1/2\"", category: "Pipa", supplier: "-", buy_price: "22000", sell_price: "28000", current_stock: 18, defective_stock: 2, min_stock: 20, rack_location: "D1-R08" },
-  { id: "INV-005", sku_code: "SMN-HLC40", name: "Semen Holcim 40kg", category: "Semen", supplier: "-", buy_price: "42000", sell_price: "49000", current_stock: 88, defective_stock: 0, min_stock: 30, rack_location: "A1-R02" },
-  { id: "INV-215", sku_code: "PPA-WAV3", name: "Pipa PVC Wavin 3 Inch", category: "Pipa", supplier: "-", buy_price: "35000", sell_price: "45000", current_stock: 75, defective_stock: 0, min_stock: 20, rack_location: "B-12" },
-];
-
 const emptyForm = {
   nama_barang: "",
   sku_code: "",
@@ -39,7 +30,7 @@ const emptyForm = {
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export default function InventoryPage() {
-  const [items, setItems] = useState<InventoryItem[]>(MOCK_ITEMS);
+  const [items, setItems] = useState<InventoryItem[]>([]);
   const [search, setSearch] = useState("");
   const [filterKategori, setFilterKategori] = useState("Semua Kategori");
   const [filterStatus, setFilterStatus] = useState("Semua Status");
@@ -48,14 +39,18 @@ export default function InventoryPage() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [summary, setSummary] = useState({ stok_habis: 0, di_bawah_minimum: 0, akan_expired: 0 });
 
   useEffect(() => {
+    setLoading(true);
     inventoryApi.getProducts()
       .then((res) => {
-        if (res.data?.length) setItems(res.data);
+        setItems(res.data || []);
       })
-      .catch(() => { /* keep mock data */ })
+      .catch((err) => {
+        console.error(err);
+        toast.error("Gagal memuat inventaris barang");
+        setItems([]);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -69,9 +64,9 @@ export default function InventoryPage() {
   });
 
   const localSummary = {
-    stokHabis: summary.stok_habis || items.filter((i) => i.current_stock === 0).length,
-    dibawahMin: summary.di_bawah_minimum || items.filter((i) => i.current_stock > 0 && i.current_stock <= i.min_stock).length,
-    akanExpired: summary.akan_expired || 0,
+    stokHabis: items.filter((i) => i.current_stock === 0).length,
+    dibawahMin: items.filter((i) => i.current_stock > 0 && i.current_stock <= i.min_stock).length,
+    akanExpired: 0,
   };
 
   const handleSave = async () => {
@@ -220,8 +215,24 @@ export default function InventoryPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((item) => (
-                  <tr key={item.id} className="animate-fade-in">
+                {loading ? (
+                  <tr>
+                    <td colSpan={10} className="text-center py-8">
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <Loader2 className="animate-spin text-blue-600" size={24} />
+                        <span className="text-sm text-gray-500">Memuat data inventaris...</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={10} className="text-center py-8 text-sm text-gray-400">
+                      Belum ada barang di inventaris.
+                    </td>
+                  </tr>
+                ) : (
+                  filtered.map((item) => (
+                    <tr key={item.id} className="animate-fade-in">
                     <td><input type="checkbox" className="rounded" /></td>
                     <td className="font-mono text-xs text-gray-500">{item.id}</td>
                     <td>
@@ -258,7 +269,8 @@ export default function InventoryPage() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                ))
+              )}
               </tbody>
             </table>
           </div>

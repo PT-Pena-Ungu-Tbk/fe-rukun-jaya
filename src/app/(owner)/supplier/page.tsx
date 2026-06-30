@@ -1,10 +1,10 @@
 "use client";
 
 import TopNav from "@/components/layout/TopNav";
-import { mockSuppliers } from "@/lib/mockData";
 import { formatRupiah } from "@/lib/utils";
-import { Building, Package, ShoppingCart, Star, Plus, Check, ChevronRight, ChevronLeft } from "lucide-react";
+import { Building, Package, ShoppingCart, Star, Plus, Check, ChevronRight, ChevronLeft, AlertTriangle } from "lucide-react";
 import Badge from "@/components/ui/Badge";
+import { mockSuppliers } from "@/lib/mockData";
 
 function StarRating({ rating }: { rating: number }) {
   return (
@@ -31,6 +31,17 @@ export default function SupplierPage() {
     <div className="flex flex-col h-full">
       <TopNav title="Supplier Management" />
       <div className="p-6 overflow-auto">
+        {/* API Disclaimer Banner */}
+        <div className="mb-5 bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3 shadow-sm">
+          <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <h4 className="text-sm font-semibold text-amber-800">Simulasi Data Supplier</h4>
+            <p className="text-xs text-amber-700 mt-0.5">
+              Data supplier dan performa vendor di bawah ini adalah simulasi. Backend API belum menyediakan endpoint <code className="bg-amber-100 px-1.5 py-0.5 rounded font-mono text-[11px]">GET /api/v1/suppliers</code>.
+            </p>
+          </div>
+        </div>
+
         <div className="mb-5">
           <h2 className="text-xl font-bold text-slate-800">Supplier Management</h2>
           <p className="text-sm text-slate-500">Monitor procurement performance and manage vendor relationships.</p>
@@ -101,8 +112,8 @@ export default function SupplierPage() {
                           s.status === "Active"
                             ? "success"
                             : s.status === "On Hold"
-                            ? "warning"
-                            : "neutral"
+                              ? "warning"
+                              : "neutral"
                         }
                       >
                         {s.status}
@@ -138,11 +149,10 @@ export default function SupplierPage() {
                 ].map((step, i) => (
                   <div key={step.label} className="flex items-center gap-2">
                     <div className="flex flex-col items-center gap-1">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
-                        step.done ? "bg-green-500 text-white" :
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${step.done ? "bg-green-500 text-white" :
                         step.active ? "bg-blue-600 text-white" :
-                        "bg-slate-100 text-slate-400"
-                      }`}>
+                          "bg-slate-100 text-slate-400"
+                        }`}>
                         {step.done ? <Check className="w-4 h-4" /> : i + 1}
                       </div>
                       <span className="text-[9px] text-center text-slate-500 max-w-[52px] font-medium">

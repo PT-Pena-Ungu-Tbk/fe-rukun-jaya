@@ -1,11 +1,11 @@
 "use client";
 
 import TopNav from "@/components/layout/TopNav";
-import { mockStorageZones, mockProducts } from "@/lib/mockData";
 import { formatRupiah } from "@/lib/utils";
-import { Warehouse, Zap, TrendingUp, ArrowDown, ArrowUp, RefreshCw } from "lucide-react";
+import { Warehouse, Zap, TrendingUp, ArrowDown, ArrowUp, RefreshCw, AlertTriangle } from "lucide-react";
 import Badge from "@/components/ui/Badge";
 import { cn } from "@/lib/utils";
+import { mockStorageZones } from "@/lib/mockData";
 
 const WORKFLOW = [
   { label: "Inbound Receiving", done: true },
@@ -34,6 +34,17 @@ export default function WarehousePage() {
     <div className="flex flex-col h-full">
       <TopNav title="Warehouse Stock & Allocation" />
       <div className="p-6 overflow-auto">
+        {/* API Disclaimer Banner */}
+        <div className="mb-5 bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3 shadow-sm">
+          <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <h4 className="text-sm font-semibold text-amber-800">Simulasi Data Warehouse</h4>
+            <p className="text-xs text-amber-700 mt-0.5">
+              Data alokasi gudang dan zona penyimpanan di bawah ini adalah simulasi. Backend API belum menyediakan endpoint <code className="bg-amber-100 px-1.5 py-0.5 rounded font-mono text-[11px]">GET /api/v1/warehouse/storage-zones</code>.
+            </p>
+          </div>
+        </div>
+
         <div className="mb-5">
           <h2 className="text-xl font-bold text-slate-800">Warehouse Stock & Allocation</h2>
           <p className="text-sm text-slate-500">
@@ -67,11 +78,10 @@ export default function WarehousePage() {
             {WORKFLOW.map((step, i) => (
               <div key={step.label} className="flex items-center gap-3">
                 <div className="flex flex-col items-center gap-1.5">
-                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
-                    step.done ? "bg-green-500 text-white" :
+                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${step.done ? "bg-green-500 text-white" :
                     step.active ? "bg-blue-600 text-white" :
-                    "bg-slate-100 text-slate-400"
-                  }`}>
+                      "bg-slate-100 text-slate-400"
+                    }`}>
                     <Warehouse className="w-4 h-4" />
                   </div>
                   <span className="text-[10px] text-center text-slate-500 max-w-[60px] font-medium">
@@ -103,10 +113,9 @@ export default function WarehousePage() {
                 <p className="text-xs text-slate-500 mb-3">{zone.description}</p>
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-xs text-slate-500">Capacity</span>
-                  <span className={`text-sm font-bold ${
-                    zone.capacity_percentage >= 85 ? "text-red-600" :
+                  <span className={`text-sm font-bold ${zone.capacity_percentage >= 85 ? "text-red-600" :
                     zone.capacity_percentage >= 60 ? "text-amber-600" : "text-blue-600"
-                  }`}>
+                    }`}>
                     {zone.capacity_percentage}%
                   </span>
                 </div>
@@ -165,7 +174,7 @@ export default function WarehousePage() {
                       {m.movement === "transfer" && <RefreshCw className="w-3 h-3 text-blue-500" />}
                       <span className="text-slate-500">{
                         m.movement === "down" ? "Outbound " :
-                        m.movement === "up" ? "Inbound " : "Transfer "
+                          m.movement === "up" ? "Inbound " : "Transfer "
                       }{m.time}</span>
                     </div>
                   </td>

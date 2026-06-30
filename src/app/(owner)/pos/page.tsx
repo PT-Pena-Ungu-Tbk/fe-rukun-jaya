@@ -10,29 +10,21 @@ import type { Product } from "@/types";
 
 interface CartItem { product: Product; qty: number; }
 
-const FALLBACK_PRODUCTS: Product[] = [
-  { id: "INV-001", sku_code: "SKU-C-001", name: "Beras 5kg", category: "Sembako", supplier: "-", buy_price: "55000", sell_price: "65000", current_stock: 450, defective_stock: 0, min_stock: 20, rack_location: "R-A1-01" },
-  { id: "INV-002", sku_code: "SKU-N-05C", name: "Paku Kayu 5cm", category: "Bangunan", supplier: "-", buy_price: "18000", sell_price: "22000", current_stock: 45, defective_stock: 0, min_stock: 20, rack_location: "R-C1-12" },
-  { id: "INV-003", sku_code: "SKU-S-10M", name: "Minyak 1L", category: "Sembako", supplier: "-", buy_price: "26000", sell_price: "32000", current_stock: 1200, defective_stock: 0, min_stock: 50, rack_location: "R-B2-04" },
-  { id: "INV-006", sku_code: "SKU-SMN-TR50", name: "Semen Tiga Roda 50kg", category: "Semen", supplier: "-", buy_price: "55000", sell_price: "65000", current_stock: 200, defective_stock: 0, min_stock: 30, rack_location: "R-A1-03" },
-  { id: "INV-007", sku_code: "SKU-CAT-AV5", name: "Cat Tembok Avian 5kg", category: "Cat", supplier: "-", buy_price: "80000", sell_price: "95000", current_stock: 30, defective_stock: 0, min_stock: 10, rack_location: "R-B1-02" },
-  { id: "INV-008", sku_code: "SKU-BSI-10", name: "Besi Beton 10mm", category: "Besi", supplier: "-", buy_price: "90000", sell_price: "105000", current_stock: 500, defective_stock: 0, min_stock: 50, rack_location: "R-C2-01" },
-];
-
 const filterTabs = ["Semua", "Nama", "SKU", "Rak"];
-const paymentMethods = ["CASH", "TRANSFER", "QRIS", "CREDIT"] as const;
+const paymentMethods = ["CASH"] as const;
 
 export default function POSPage() {
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState("Semua");
-  const [products, setProducts] = useState<Product[]>(FALLBACK_PRODUCTS);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(true);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [vipPhone, setVipPhone] = useState("");
   const [vipMember, setVipMember] = useState<{ nama: string; level: string; poin: number } | null>(null);
   const [discountType, setDiscountType] = useState<"%" | "Rp">("%");
   const [discountValue, setDiscountValue] = useState(0);
   const [cashPaid, setCashPaid] = useState(0);
-  const [paymentMethod, setPaymentMethod] = useState<"CASH" | "TRANSFER" | "QRIS" | "CREDIT">("CASH");
+  const [paymentMethod, setPaymentMethod] = useState<"CASH">("CASH");
   const [showReceipt, setShowReceipt] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
   const [trxId, setTrxId] = useState(`TRX-${Math.floor(88000 + Math.random() * 999)}`);
@@ -41,11 +33,16 @@ export default function POSPage() {
 
   // Fetch products from API (debounced)
   const fetchProducts = useCallback(async (q: string) => {
+    setLoadingProducts(true);
     try {
       const result = await transactionsApi.searchProducts({ search: q || undefined });
-      if (result.data?.length) setProducts(result.data);
-    } catch {
-      // keep fallback data
+      setProducts(result.data || []);
+    } catch (err) {
+      console.error(err);
+      toast.error("Gagal memuat produk dari API");
+      setProducts([]);
+    } finally {
+      setLoadingProducts(false);
     }
   }, []);
 
@@ -59,7 +56,12 @@ export default function POSPage() {
     const s = search.toLowerCase();
     if (activeFilter === "SKU") return p.sku_code.toLowerCase().includes(s);
     if (activeFilter === "Rak") return (p.rack_location ?? "").toLowerCase().includes(s);
-    return p.name.toLowerCase().includes(s) || p.sku_code.toLowerCase().includes(s);
+    if (activeFilter === "Nama") return p.name.toLowerCase().includes(s);
+    return (
+      p.name.toLowerCase().includes(s) ||
+      p.sku_code.toLowerCase().includes(s) ||
+      (p.rack_location ?? "").toLowerCase().includes(s)
+    );
   });
 
   const addToCart = (product: Product) => {
@@ -123,10 +125,110 @@ export default function POSPage() {
     }
   };
 
+  const handleCancelTransaction = () => {
+    setCart([]);
+    setVipPhone("");
+    setVipMember(null);
+    setDiscountValue(0);
+    setCashPaid(0);
+    toast.success("Transaksi dibatalkan");
+  };
+
+  const printReceipt = () => {
+    const printWindow = window.open("", "_blank", "width=600,height=600");
+    if (!printWindow) {
+      toast.error("Gagal membuka jendela cetak. Pastikan pop-up diizinkan.");
+      return;
+    }
+
+    const dateStr = new Date().toLocaleDateString("id-ID", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+
+    const itemsHtml = cart.map(item => `
+      <tr>
+        <td style="padding: 4px 0;">${item.product.name}<br/><span style="font-size: 10px; color: #666;">${item.qty} x ${formatRupiah(Number(item.product.sell_price))}</span></td>
+        <td style="text-align: right; padding: 4px 0; vertical-align: bottom;">${formatRupiah(Number(item.product.sell_price) * item.qty)}</td>
+      </tr>
+    `).join("");
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Struk Belanja - Toko Rukun Jaya</title>
+          <style>
+            body { font-family: 'Courier New', Courier, monospace; width: 300px; margin: 0 auto; padding: 20px; font-size: 12px; color: #000; }
+            .text-center { text-align: center; }
+            .bold { font-weight: bold; }
+            .header { margin-bottom: 15px; }
+            .header h2 { margin: 0 0 5px 0; font-size: 16px; }
+            .header p { margin: 2px 0; font-size: 11px; }
+            .divider { border-top: 1px dashed #000; margin: 10px 0; }
+            table { width: 100%; border-collapse: collapse; }
+            .totals td { padding: 2px 0; }
+            .footer { margin-top: 20px; font-size: 10px; }
+            @media print {
+              body { margin: 0; padding: 10px; }
+              @page { size: auto; margin: 0; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header text-center">
+            <h2>TOKO RUKUN JAYA</h2>
+            <p>Jl. Raya Trans Sumatera, Lampung</p>
+            <p>Telp: 0811-2233-4455</p>
+          </div>
+          <div class="divider"></div>
+          <div>
+            <p>Invoice : <span class="bold">${trxId}</span></p>
+            <p>Tanggal : ${dateStr}</p>
+            <p>Pelanggan: ${vipMember?.nama || "Umum"}</p>
+          </div>
+          <div class="divider"></div>
+          <table>
+            <tbody>
+              ${itemsHtml}
+            </tbody>
+          </table>
+          <div class="divider"></div>
+          <table class="totals">
+            <tbody>
+              <tr><td>Subtotal</td><td style="text-align: right;">${formatRupiah(subtotal)}</td></tr>
+              <tr><td>Diskon</td><td style="text-align: right;">-${formatRupiah(discountAmt)}</td></tr>
+              <tr><td>PPN (11%)</td><td style="text-align: right;">${formatRupiah(ppn)}</td></tr>
+              <tr class="bold" style="font-size: 13px;"><td>TOTAL</td><td style="text-align: right;">${formatRupiah(grandTotal)}</td></tr>
+              <tr><td>Bayar</td><td style="text-align: right;">${formatRupiah(cashPaid || grandTotal)}</td></tr>
+              <tr><td>Kembali</td><td style="text-align: right;">${formatRupiah(Math.max(0, (cashPaid || grandTotal) - grandTotal))}</td></tr>
+            </tbody>
+          </table>
+          <div class="divider"></div>
+          <div class="footer text-center">
+            <p class="bold">TERIMA KASIH</p>
+            <p>Atas Kunjungan Anda</p>
+            <p>Barang yang sudah dibeli tidak dapat ditukar/dikembalikan.</p>
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() { window.close(); }, 500);
+            }
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   const resetTransaction = () => {
     setCart([]); setVipPhone(""); setVipMember(null);
     setDiscountValue(0); setCashPaid(0);
     setShowReceipt(false); setShowDetail(false);
+    setTrxId(`TRX-${Math.floor(88000 + Math.random() * 999)}`);
     toast.success("Transaksi baru dimulai");
   };
 
@@ -172,15 +274,32 @@ export default function POSPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((p) => (
-                    <tr key={p.id} onClick={() => addToCart(p)} className="cursor-pointer">
-                      <td className="text-blue-600 font-medium">{p.name}</td>
-                      <td className="font-mono text-xs text-gray-500">{p.sku_code}</td>
-                      <td className="text-gray-500 text-xs">{p.rack_location ?? "-"}</td>
-                      <td className={`font-semibold ${p.current_stock < p.min_stock ? "text-amber-600" : "text-gray-800"}`}>{p.current_stock.toLocaleString("id-ID")}</td>
-                      <td>{statusBadge(p.current_stock === 0 ? "OUT_OF_STOCK" : p.current_stock <= p.min_stock ? "LOW_STOCK" : "IN_STOCK")}</td>
+                  {loadingProducts ? (
+                    <tr>
+                      <td colSpan={5} className="text-center py-8">
+                        <div className="flex flex-col items-center justify-center gap-2">
+                          <Loader2 className="animate-spin text-blue-600" size={20} />
+                          <span className="text-xs text-gray-500">Memuat produk...</span>
+                        </div>
+                      </td>
                     </tr>
-                  ))}
+                  ) : filtered.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="text-center py-8 text-xs text-gray-400">
+                        Produk tidak ditemukan atau belum tersedia.
+                      </td>
+                    </tr>
+                  ) : (
+                    filtered.map((p) => (
+                      <tr key={p.id} onClick={() => addToCart(p)} className="cursor-pointer">
+                        <td className="text-blue-600 font-medium">{p.name}</td>
+                        <td className="font-mono text-xs text-gray-500">{p.sku_code}</td>
+                        <td className="text-gray-500 text-xs">{p.rack_location ?? "-"}</td>
+                        <td className={`font-semibold ${p.current_stock < p.min_stock ? "text-amber-600" : "text-gray-800"}`}>{p.current_stock.toLocaleString("id-ID")}</td>
+                        <td>{statusBadge(p.current_stock === 0 ? "OUT_OF_STOCK" : p.current_stock <= p.min_stock ? "LOW_STOCK" : "IN_STOCK")}</td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -193,7 +312,7 @@ export default function POSPage() {
                 <ShoppingCart size={16} /> Pesanan Saat Ini
               </h3>
               {cart.length > 0 && (
-                <button onClick={() => setCart([])} className="text-xs text-red-500 hover:underline">Hapus Semua</button>
+                <button onClick={handleCancelTransaction} className="text-xs text-red-500 hover:underline">Hapus Semua</button>
               )}
             </div>
 
@@ -257,13 +376,8 @@ export default function POSPage() {
               {/* Payment Method */}
               <div className="p-3 border-b border-gray-100">
                 <p className="text-xs font-semibold text-gray-600 mb-2">Metode Pembayaran</p>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {paymentMethods.map((m) => (
-                    <button key={m} onClick={() => setPaymentMethod(m)}
-                      className={`py-1.5 text-xs font-medium rounded-lg border transition-colors ${paymentMethod === m ? "bg-blue-600 text-white border-blue-600" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}>
-                      {m === "CASH" ? "Tunai" : m === "TRANSFER" ? "Transfer" : m === "QRIS" ? "QRIS" : "Kredit"}
-                    </button>
-                  ))}
+                <div className="w-full py-2 text-center text-xs font-bold rounded-lg bg-green-50 text-green-700 border border-green-200">
+                  💵 Tunai (Cash Only)
                 </div>
               </div>
             </div>
@@ -328,7 +442,7 @@ export default function POSPage() {
               <button onClick={() => setShowDetail(true)} className="btn-primary w-full justify-center py-2.5">
                 <CheckCircle size={15} /> Lihat Detail Transaksi
               </button>
-              <button className="btn-secondary w-full justify-center">
+              <button onClick={printReceipt} className="btn-secondary w-full justify-center">
                 <Printer size={15} /> Cetak Struk
               </button>
               <button onClick={resetTransaction} className="text-sm text-blue-600 hover:underline mt-1">
@@ -356,7 +470,7 @@ export default function POSPage() {
               </div>
               <div className="flex items-center gap-3">
                 <span className="badge-success text-sm px-3 py-1">Lunas</span>
-                <button onClick={() => setShowReceipt(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                <button onClick={resetTransaction} className="text-gray-400 hover:text-gray-600 transition-colors">
                   <X size={18} />
                 </button>
               </div>
@@ -371,10 +485,7 @@ export default function POSPage() {
               </div>
               <div className="bg-blue-50 rounded-xl p-4">
                 <p className="text-xs font-bold text-blue-700 uppercase tracking-wide mb-2">Metode Pembayaran</p>
-                <p className="font-bold text-gray-900">
-                  {paymentMethod === "CASH" ? "💵 Tunai" : paymentMethod === "TRANSFER" ? "🏦 Transfer Bank" : paymentMethod === "QRIS" ? "📱 QRIS" : "📋 Kredit"}
-                </p>
-                {paymentMethod === "TRANSFER" && <p className="text-sm text-gray-500 mt-0.5">Ref: {Math.floor(90000000 + Math.random() * 9999999)}</p>}
+                <p className="font-bold text-gray-900">💵 Tunai</p>
               </div>
             </div>
 
@@ -421,13 +532,13 @@ export default function POSPage() {
 
             {/* Footer */}
             <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100">
-              <button onClick={() => setShowDetail(false)} className="btn-secondary">
+              <button onClick={resetTransaction} className="btn-secondary">
                 <X size={14} /> Tutup
               </button>
-              <button className="btn-secondary">
+              <button onClick={printReceipt} className="btn-secondary">
                 <Download size={14} /> Ekspor PDF
               </button>
-              <button className="btn-primary">
+              <button onClick={printReceipt} className="btn-primary">
                 <Printer size={14} /> Cetak Struk
               </button>
             </div>
