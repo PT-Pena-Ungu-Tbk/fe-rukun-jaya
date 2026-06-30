@@ -5,84 +5,117 @@ import TopNav from "@/components/layout/TopNav";
 import { Download, Plus, RotateCcw, MoreVertical, Loader2 } from "lucide-react";
 import { formatRupiah } from "@/lib/utils";
 import { transactionsApi } from "@/lib/api";
+import apiClient from "@/lib/axios";
+import toast from "react-hot-toast";
 
 const getStatusConfig = (status: string) => {
   const normalized = status?.toUpperCase() || "SUCCESS";
   if (normalized === "SUCCESS" || normalized === "LUNAS" || normalized === "SUKSES") {
-    return { label: "Success", dot: "bg-green-500", badge: "bg-green-50 text-green-700 border border-green-200" };
-  }
-  if (normalized === "PENDING") {
-    return { label: "Pending", dot: "bg-amber-500", badge: "bg-amber-50 text-amber-700 border border-amber-200" };
-  }
-  if (normalized === "CANCELLED" || normalized === "BATAL") {
-    return { label: "Cancelled", dot: "bg-red-400", badge: "bg-red-50 text-red-600 border border-red-200" };
+    return { label: "Sukses", dot: "bg-green-500", badge: "bg-green-50 text-green-700 border border-green-200" };
   }
   return { label: status, dot: "bg-gray-400", badge: "bg-gray-50 text-gray-600 border border-gray-200" };
 };
 
 export default function TransactionHistoryPage() {
-  const [paymentFilter, setPaymentFilter] = useState("All Payment Methods");
-  const [statusFilter, setStatusFilter] = useState("All");
-  const [cashierFilter, setCashierFilter] = useState("All Cashiers");
+  const [cashierFilter, setCashierFilter] = useState("Semua Kasir");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [transactions, setTransactions] = useState<any[]>([]);
+  const [rawTransactions, setRawTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const fetchTransactions = () => {
+    setLoading(true);
+    setError(null);
+    transactionsApi.getAllTransactions()
+      .then((res) => {
+        setRawTransactions(res?.data || []);
+      })
+      .catch((err) => {
+        console.error(err);
+        setError("Gagal memuat riwayat transaksi");
+        setRawTransactions([]);
+      })
+      .finally(() => setLoading(false));
+  };
+
   useEffect(() => {
-    const fetchTransactions = () => {
-      setLoading(true);
-      setError(null);
-      const params: any = {};
-      if (paymentFilter !== "All Payment Methods") params.payment_method = paymentFilter;
-      if (statusFilter !== "All") params.status = statusFilter;
-      if (cashierFilter !== "All Cashiers") params.cashier_id = cashierFilter;
-      if (dateFrom) params.date_from = new Date(dateFrom).toISOString();
-      if (dateTo) params.date_to = new Date(dateTo).toISOString();
-
-      transactionsApi.getTransactions(params)
-        .then((res) => {
-          const data = res?.data || [];
-          const mapped = data.map((t, idx) => {
-            const d = new Date(t.date || "");
-            const dateStr = isNaN(d.getTime()) ? "-" : d.toLocaleDateString("id-ID", { day: "numeric", month: "short" });
-            const timeStr = isNaN(d.getTime()) ? "-" : d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
-            return {
-              no: idx + 1,
-              id: t.id || t.invoice_no || "",
-              date: dateStr,
-              time: timeStr,
-              customer: t.customer || "Walk-in Customer",
-              type: t.customer_type || "",
-              cashier: t.cashier || "-",
-              method: t.method || "-",
-              amount: Number(t.total_amount || 0),
-              status: t.status || "Success"
-            };
-          });
-          setTransactions(mapped);
-        })
-        .catch((err) => {
-          console.error(err);
-          setError("Gagal memuat riwayat transaksi");
-          setTransactions([]);
-        })
-        .finally(() => setLoading(false));
-    };
-
     fetchTransactions();
-  }, [paymentFilter, statusFilter, cashierFilter, dateFrom, dateTo]);
+  }, []);
 
   const resetFilters = () => {
-    setPaymentFilter("All Payment Methods");
-    setStatusFilter("All");
-    setCashierFilter("All Cashiers");
+    setCashierFilter("Semua Kasir");
     setDateFrom("");
     setDateTo("");
   };
 
-  const cashiers = Array.from(new Set(transactions.map(t => t.cashier).filter(Boolean)));
+  const cashiers = Array.from(new Set(rawTransactions.map(t => t.cashier_name).filter(Boolean)));
+
+  const filteredTransactions = rawTransactions.filter((t) => {
+    if (cashierFilter !== "Semua Kasir" && t.cashier_name !== cashierFilter) {
+      return false;
+    }
+    if (dateFrom) {
+      const d = new Date(t.created_at);
+      const start = new Date(dateFrom);
+      start.setHours(0, 0, 0, 0);
+      if (d < start) return false;
+    }
+    if (dateTo) {
+      const d = new Date(t.created_at);
+      const end = new Date(dateTo);
+      end.setHours(23, 59, 59, 999);
+      if (d > end) return false;
+    }
+    return true;
+  });
+
+  const mappedTransactions = filteredTransactions.map((t, idx) => {
+    const d = new Date(t.created_at);
+    const dateStr = isNaN(d.getTime()) ? "-" : d.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+    const timeStr = isNaN(d.getTime()) ? "-" : d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB";
+    
+    const itemsSummary = t.items && Array.isArray(t.items)
+      ? t.items.map((item: any) => `${item.product_name} (${item.quantity}x)`).join(", ")
+      : "-";
+
+    return {
+      no: idx + 1,
+      id: t.id,
+      invoice_no: t.invoice_no,
+      dateTime: `${dateStr} ${timeStr}`,
+      customer: t.member_name || "Pelanggan Umum",
+      customerType: t.member_name ? "VIP" : "",
+      cashier: t.cashier_name || "-",
+      items: itemsSummary,
+      amount: Number(t.grand_total || 0),
+    };
+  });
+
+  const handleExportExcel = async () => {
+    try {
+      toast.loading("Mengunduh file Excel...", { id: "export-excel" });
+      const response = await apiClient.get("/transactions/export/excel", {
+        responseType: "blob",
+        params: {
+          startDate: dateFrom || undefined,
+          endDate: dateTo || undefined,
+        }
+      });
+      const blob = new Blob([response.data], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `Export_Transaksi_${Date.now()}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast.success("File Excel berhasil diunduh!", { id: "export-excel" });
+    } catch (err) {
+      console.error(err);
+      toast.error("Gagal mengunduh file", { id: "export-excel" });
+    }
+  };
 
   return (
     <div className="flex-1 flex flex-col min-h-screen">
@@ -91,12 +124,13 @@ export default function TransactionHistoryPage() {
         {/* Header */}
         <div className="flex items-start justify-between mb-5">
           <div>
-            <h2 className="text-lg font-bold text-gray-900">Overview</h2>
-            <p className="text-sm text-gray-500">A snapshot of your store&apos;s financial performance.</p>
+            <h2 className="text-lg font-bold text-gray-900">Ringkasan</h2>
+            <p className="text-sm text-gray-500">Gambaran umum performa keuangan toko Anda.</p>
           </div>
           <div className="flex items-center gap-2">
-            <button className="btn-secondary text-sm"><Download size={14} /> Export CSV</button>
-            <button className="btn-primary text-sm"><Plus size={14} /> New Transaction</button>
+            <button onClick={handleExportExcel} className="btn-secondary text-sm">
+              <Download size={14} /> Ekspor Excel
+            </button>
           </div>
         </div>
 
@@ -119,26 +153,16 @@ export default function TransactionHistoryPage() {
               className="outline-none bg-transparent text-sm text-gray-700 w-32"
             />
           </div>
-          <select value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value)}
-            className="border border-gray-200 bg-white rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option>All Payment Methods</option>
-            <option>Cash</option><option>Transfer</option><option>Credit</option><option>QRIS</option>
-          </select>
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
-            className="border border-gray-200 bg-white rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option value="All">Status: All</option>
-            <option>Success</option><option>Pending</option><option>Cancelled</option>
-          </select>
           <select value={cashierFilter} onChange={(e) => setCashierFilter(e.target.value)}
             className="border border-gray-200 bg-white rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option>All Cashiers</option>
-            {cashiers.map((cashier) => (
+            <option value="All Cashiers">Semua Kasir</option>
+            {cashiers.map((cashier: any) => (
               <option key={cashier} value={cashier}>{cashier}</option>
             ))}
           </select>
           <button onClick={resetFilters}
             className="ml-auto flex items-center gap-1.5 text-sm text-blue-600 hover:underline font-medium">
-            <RotateCcw size={13} /> Reset Filters
+            <RotateCcw size={13} /> Atur Ulang Filter
           </button>
         </div>
 
@@ -147,8 +171,8 @@ export default function TransactionHistoryPage() {
           <div className="flex-1 bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-gray-100">
-                  {["NO.", "TRANSACTION ID", "DATE & TIME", "CUSTOMER", "CASHIER", "METHOD", "AMOUNT", "STATUS", "ACTIONS"].map((h) => (
+                <tr className="border-b border-gray-100 bg-gray-50">
+                  {["NO.", "NO. FAKTUR", "TANGGAL & WAKTU", "PELANGGAN", "KASIR", "BARANG", "TOTAL BELANJA", "STATUS", "AKSI"].map((h) => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -169,39 +193,36 @@ export default function TransactionHistoryPage() {
                       {error}
                     </td>
                   </tr>
-                ) : transactions.length === 0 ? (
+                ) : mappedTransactions.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="text-center py-8 text-sm text-gray-400">
                       Belum ada riwayat transaksi.
                     </td>
                   </tr>
                 ) : (
-                  transactions.map((t) => {
-                    const cfg = getStatusConfig(t.status);
-                    const isCancelled = t.status?.toUpperCase() === "CANCELLED" || t.status?.toUpperCase() === "BATAL";
+                  mappedTransactions.map((t) => {
+                    const cfg = getStatusConfig("SUCCESS");
                     return (
                       <tr key={t.id} className="hover:bg-gray-50 transition-colors">
                         <td className="px-4 py-4 text-sm text-gray-500">{t.no}</td>
                         <td className="px-4 py-4">
-                          <span className="text-sm font-semibold text-blue-600">#{t.id}</span>
+                          <span className="text-sm font-semibold text-blue-600">#{t.invoice_no}</span>
                         </td>
-                        <td className="px-4 py-4 text-sm text-gray-700 whitespace-nowrap">
-                          {t.date}<br />{t.time}
+                        <td className="px-4 py-4 text-sm text-gray-700">
+                          {t.dateTime}
                         </td>
                         <td className="px-4 py-4">
                           <p className="text-sm font-medium text-gray-800">{t.customer}</p>
-                          {t.type && (
-                            <span className={`text-[10px] font-bold uppercase tracking-wide ${t.type === "VIP" ? "text-amber-500" : "text-gray-400"}`}>
-                              {t.type}
+                          {t.customerType && (
+                            <span className={`text-[10px] font-bold uppercase tracking-wide text-amber-500`}>
+                              {t.customerType}
                             </span>
                           )}
                         </td>
                         <td className="px-4 py-4 text-sm text-gray-600">{t.cashier}</td>
-                        <td className="px-4 py-4 text-sm text-gray-600">{t.method}</td>
-                        <td className="px-4 py-4">
-                          <p className={`text-sm font-bold ${isCancelled ? "line-through text-gray-400" : "text-gray-900"}`}>
-                            {formatRupiah(t.amount)}
-                          </p>
+                        <td className="px-4 py-4 text-sm text-gray-600 max-w-xs truncate" title={t.items}>{t.items}</td>
+                        <td className="px-4 py-4 text-sm font-bold text-gray-900">
+                          {formatRupiah(t.amount)}
                         </td>
                         <td className="px-4 py-4">
                           <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${cfg.badge}`}>
@@ -222,7 +243,7 @@ export default function TransactionHistoryPage() {
             </table>
 
             <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 text-sm text-gray-500">
-              <span>Showing 1 to {transactions.length} of {transactions.length} entries</span>
+              <span>Menampilkan 1 sampai {mappedTransactions.length} dari {mappedTransactions.length} data</span>
               <div className="flex items-center gap-1">
                 <button className="w-8 h-8 flex items-center justify-center border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-500 text-xs">‹</button>
                 <button className="w-8 h-8 flex items-center justify-center rounded-lg text-xs font-medium bg-blue-600 text-white">1</button>

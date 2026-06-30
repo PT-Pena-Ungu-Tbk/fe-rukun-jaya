@@ -6,6 +6,7 @@ import { Eye, EyeOff, User, Lock, ArrowRight, Loader2 } from "lucide-react";
 import { saveAuth } from "@/lib/auth";
 import { authApi } from "@/lib/api";
 import toast from "react-hot-toast";
+import logoImg from "@/assets/logo.png";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -52,9 +53,7 @@ export default function LoginPage() {
       {/* Left Panel */}
       <div className="w-[40%] bg-blue-600 flex flex-col justify-between p-10 animate-fade-in">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-md">
-            <span className="text-blue-600 font-extrabold text-lg">RJ</span>
-          </div>
+          <img src={logoImg.src} alt="Logo Toko Rukun Jaya" className="w-12 h-12 object-contain bg-white rounded-2xl p-1 shadow-md" />
           <span className="text-white font-bold text-xl">Toko Rukun Jaya</span>
         </div>
 
@@ -75,12 +74,12 @@ export default function LoginPage() {
       <div className="flex-1 bg-white flex items-center justify-center px-10">
         <div className="w-full max-w-sm animate-scale-in">
           <div className="border border-gray-200 rounded-2xl p-8 shadow-sm">
-            <h3 className="text-xl font-bold text-gray-900 mb-1">Welcome back</h3>
-            <p className="text-sm text-gray-500 mb-6">Please enter your credentials to access the system.</p>
+            <h3 className="text-xl font-bold text-gray-900 mb-1">Selamat Datang</h3>
+            <p className="text-sm text-gray-500 mb-6">Silakan masukkan email/username dan kata sandi Anda untuk mengakses sistem.</p>
 
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
-                <label className="form-label">Email or Username</label>
+                <label className="form-label">Email atau Username</label>
                 <div className="relative">
                   <User size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
@@ -94,7 +93,7 @@ export default function LoginPage() {
               </div>
 
               <div>
-                <label className="form-label">Password</label>
+                <label className="form-label">Kata Sandi</label>
                 <div className="relative">
                   <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
@@ -112,7 +111,7 @@ export default function LoginPage() {
               </div>
 
               <button type="submit" disabled={loading} className="btn-primary w-full justify-center py-2.5 mt-2">
-                {loading ? <Loader2 size={16} className="animate-spin" /> : <>Sign In <ArrowRight size={15} /></>}
+                {loading ? <Loader2 size={16} className="animate-spin" /> : <>Masuk <ArrowRight size={15} /></>}
               </button>
             </form>
 

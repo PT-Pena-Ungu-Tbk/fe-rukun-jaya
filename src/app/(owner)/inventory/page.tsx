@@ -39,6 +39,8 @@ export default function InventoryPage() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
 
   useEffect(() => {
     setLoading(true);
@@ -52,6 +54,14 @@ export default function InventoryPage() {
         setItems([]);
       })
       .finally(() => setLoading(false));
+
+    inventoryApi.getCategories()
+      .then((res) => setCategories(res.data || []))
+      .catch((err) => console.error("Gagal memuat kategori:", err));
+
+    inventoryApi.getSuppliers()
+      .then((res) => setSuppliers(res.data || []))
+      .catch((err) => console.error("Gagal memuat supplier:", err));
   }, []);
 
   const filtered = items.filter((item) => {
@@ -59,7 +69,7 @@ export default function InventoryPage() {
     const matchStatus = filterStatus === "Semua Status" ||
       (filterStatus === "Stok Habis" && item.current_stock === 0) ||
       (filterStatus === "Stok Rendah" && item.current_stock > 0 && item.current_stock <= item.min_stock) ||
-      (filterStatus === "In Stock" && item.current_stock > item.min_stock);
+      (filterStatus === "Stok Tersedia" && item.current_stock > item.min_stock);
     return matchSearch && matchStatus;
   });
 
@@ -74,8 +84,12 @@ export default function InventoryPage() {
       toast.error("Nama barang dan SKU wajib diisi");
       return;
     }
-    if (!uuidRegex.test(form.category_id) || !uuidRegex.test(form.supplier_id)) {
-      toast.error("Category ID dan Supplier ID harus berupa UUID dari backend");
+    if (!form.category_id || !uuidRegex.test(form.category_id)) {
+      toast.error("Kategori wajib dipilih");
+      return;
+    }
+    if (!form.supplier_id || !uuidRegex.test(form.supplier_id)) {
+      toast.error("Supplier wajib dipilih");
       return;
     }
     if (form.harga_beli <= 0 || form.harga_jual <= 0) {
@@ -138,7 +152,7 @@ export default function InventoryPage() {
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-3 gap-4 mb-5 animate-slide-up">
+        <div className="grid grid-cols-2 gap-4 mb-5 animate-slide-up">
           {/* Stok Habis */}
           <div className="relative overflow-hidden bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
             <div className="absolute top-0 right-0 w-24 h-24 bg-red-50 rounded-full -translate-y-8 translate-x-8 opacity-60" />
@@ -156,17 +170,7 @@ export default function InventoryPage() {
               <ChevronDown size={22} className="text-amber-500 mb-3" />
               <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Dibawah Minimum</p>
               <p className="text-4xl font-bold text-amber-500 leading-none">{localSummary.dibawahMin}</p>
-              <p className="text-sm text-gray-400 mt-1">Items</p>
-            </div>
-          </div>
-          {/* Barang Akan Expired */}
-          <div className="relative overflow-hidden bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-green-50 rounded-full -translate-y-8 translate-x-8 opacity-60" />
-            <div className="relative">
-              <ChevronDown size={22} className="text-green-500 mb-3" />
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Barang Akan Expired</p>
-              <p className="text-4xl font-bold text-green-600 leading-none">{localSummary.akanExpired}</p>
-              <p className="text-sm text-gray-400 mt-1">Items</p>
+              <p className="text-sm text-gray-400 mt-1">Barang</p>
             </div>
           </div>
         </div>
@@ -184,7 +188,7 @@ export default function InventoryPage() {
               <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
                 className="form-select text-sm py-2">
                 <option>Semua Status</option>
-                <option>In Stock</option><option>Stok Rendah</option><option>Stok Habis</option>
+                <option>Stok Tersedia</option><option>Stok Rendah</option><option>Stok Habis</option>
               </select>
             </div>
             <div className="flex items-center gap-2">
@@ -204,12 +208,11 @@ export default function InventoryPage() {
                 <tr>
                   <th><input type="checkbox" className="rounded" /></th>
                   <th>ID</th>
+                  <th>Kode SKU</th>
                   <th>Nama Barang</th>
-                  <th>Kondisi</th>
                   <th>Stok</th>
                   <th>Harga Beli</th>
                   <th>Harga Jual</th>
-                  <th>Exp. Date</th>
                   <th>Rak</th>
                   <th>Aksi</th>
                 </tr>
@@ -217,7 +220,7 @@ export default function InventoryPage() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={10} className="text-center py-8">
+                    <td colSpan={9} className="text-center py-8">
                       <div className="flex flex-col items-center justify-center gap-2">
                         <Loader2 className="animate-spin text-blue-600" size={24} />
                         <span className="text-sm text-gray-500">Memuat data inventaris...</span>
@@ -226,7 +229,7 @@ export default function InventoryPage() {
                   </tr>
                 ) : filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="text-center py-8 text-sm text-gray-400">
+                    <td colSpan={9} className="text-center py-8 text-sm text-gray-400">
                       Belum ada barang di inventaris.
                     </td>
                   </tr>
@@ -235,12 +238,12 @@ export default function InventoryPage() {
                     <tr key={item.id} className="animate-fade-in">
                     <td><input type="checkbox" className="rounded" /></td>
                     <td className="font-mono text-xs text-gray-500">{item.id}</td>
+                    <td className="font-mono text-xs text-gray-750 font-semibold">{item.sku_code}</td>
                     <td>
                       <Link href={`/inventory/${item.id}`} className={`font-medium hover:underline ${item.current_stock === 0 ? "text-red-600" : "text-gray-800"}`}>
                         {item.name}
                       </Link>
                     </td>
-                    <td>{kondisiBadge(item.defective_stock > 0 ? "Rusak Ringan" : "Baru")}</td>
                     <td>
                       <span className={`font-semibold ${item.current_stock === 0 ? "text-red-600" : item.current_stock <= item.min_stock ? "text-amber-600" : "text-gray-800"}`}>
                         {item.current_stock}
@@ -249,9 +252,6 @@ export default function InventoryPage() {
                     </td>
                     <td className="text-gray-700">{formatRupiah(Number(item.buy_price))}</td>
                     <td className="text-gray-700">{formatRupiah(Number(item.sell_price))}</td>
-                    <td className="text-gray-500 text-xs">
-                      -
-                    </td>
                     <td>
                       <Link href={`/inventory/${item.id}`} className="text-blue-600 hover:underline text-xs font-mono">
                         {item.rack_location ?? "-"}
@@ -317,14 +317,24 @@ export default function InventoryPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="form-label">Category ID *</label>
-                      <input value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })}
-                        placeholder="UUID kategori" className="form-input font-mono text-xs" />
+                      <label className="form-label">Kategori *</label>
+                      <select value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })}
+                        className="form-select text-sm w-full">
+                        <option value="">Pilih Kategori</option>
+                        {categories.map((c) => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
                     </div>
                     <div>
-                      <label className="form-label">Supplier ID *</label>
-                      <input value={form.supplier_id} onChange={(e) => setForm({ ...form, supplier_id: e.target.value })}
-                        placeholder="UUID supplier" className="form-input font-mono text-xs" />
+                      <label className="form-label">Supplier *</label>
+                      <select value={form.supplier_id} onChange={(e) => setForm({ ...form, supplier_id: e.target.value })}
+                        className="form-select text-sm w-full">
+                        <option value="">Pilih Supplier</option>
+                        {suppliers.map((s) => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                 </div>

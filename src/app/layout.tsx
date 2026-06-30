@@ -4,8 +4,11 @@ import { Toaster } from "react-hot-toast";
 import QueryProvider from "@/components/providers/QueryProvider";
 
 export const metadata: Metadata = {
-  title: "Rukun Jaya POS — Sistem Kasir",
+  title: "POS Rukun Jaya",
   description: "Enterprise Inventory & POS Management System",
+  icons: {
+    icon: "/logo.png",
+  },
 };
 
 export default function RootLayout({

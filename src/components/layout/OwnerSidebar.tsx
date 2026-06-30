@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -13,6 +14,9 @@ import {
   BarChart3,
   ShieldAlert,
 } from "lucide-react";
+
+import { getUser } from "@/lib/auth";
+import logoImg from "@/assets/logo.png";
 
 const navItems = [
   { href: "/dashboard",           label: "Dasbor",             icon: LayoutDashboard },
@@ -28,6 +32,22 @@ const navItems = [
 
 export default function OwnerSidebar() {
   const pathname = usePathname();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const user = mounted ? getUser() : null;
+  const isCashier = user?.role === "CASHIER";
+
+  const filteredNavItems = navItems.filter((item) => {
+    if (isCashier) {
+      const forbidden = ["/dashboard", "/user-management", "/financial-reports", "/audit-log"];
+      return !forbidden.includes(item.href);
+    }
+    return true;
+  });
 
   const isActive = (href: string) =>
     pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
@@ -36,9 +56,7 @@ export default function OwnerSidebar() {
     <aside className="w-56 min-h-screen bg-white border-r border-gray-200 flex flex-col animate-slide-left">
       {/* Logo */}
       <div className="flex items-center gap-3 px-5 py-5 border-b border-gray-100">
-        <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center shadow-sm flex-shrink-0">
-          <span className="text-white font-bold text-sm">RJ</span>
-        </div>
+        <img src={logoImg.src} alt="Logo Toko Rukun Jaya" className="w-9 h-9 object-contain flex-shrink-0" />
         <div>
           <p className="text-sm font-bold text-gray-900 leading-tight">Toko Rukun Jaya</p>
           <p className="text-[10px] text-gray-400">Enterprise POS</p>
@@ -47,7 +65,7 @@ export default function OwnerSidebar() {
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-0.5">
-        {navItems.map(({ href, label, icon: Icon }) => (
+        {filteredNavItems.map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
             href={href}

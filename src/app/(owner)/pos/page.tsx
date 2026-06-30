@@ -32,10 +32,14 @@ export default function POSPage() {
   const [processing, setProcessing] = useState(false);
 
   // Fetch products from API (debounced)
-  const fetchProducts = useCallback(async (q: string) => {
+  const fetchProducts = useCallback(async (q: string, filter: string) => {
     setLoadingProducts(true);
     try {
-      const result = await transactionsApi.searchProducts({ search: q || undefined });
+      const isRackFilter = filter === "Rak";
+      const result = await transactionsApi.searchProducts({
+        search: isRackFilter ? undefined : (q || undefined),
+        limit: 1000,
+      });
       setProducts(result.data || []);
     } catch (err) {
       console.error(err);
@@ -47,9 +51,9 @@ export default function POSPage() {
   }, []);
 
   useEffect(() => {
-    const timer = setTimeout(() => fetchProducts(search), 350);
+    const timer = setTimeout(() => fetchProducts(search, activeFilter), 350);
     return () => clearTimeout(timer);
-  }, [search, fetchProducts]);
+  }, [search, activeFilter, fetchProducts]);
 
   const filtered = products.filter((p) => {
     if (!search) return true;
@@ -117,6 +121,7 @@ export default function POSPage() {
       });
       if (result.data?.transaction_id || result.data?.invoice_no) setTrxId(result.data.transaction_id ?? result.data.invoice_no ?? trxId);
       setShowReceipt(true);
+      fetchProducts(search, activeFilter);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
       toast.error(msg ?? "Transaksi gagal diproses");
@@ -230,6 +235,7 @@ export default function POSPage() {
     setShowReceipt(false); setShowDetail(false);
     setTrxId(`TRX-${Math.floor(88000 + Math.random() * 999)}`);
     toast.success("Transaksi baru dimulai");
+    fetchProducts(search, activeFilter);
   };
 
   const statusBadge = (s: string) => {

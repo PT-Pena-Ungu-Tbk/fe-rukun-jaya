@@ -85,6 +85,14 @@ export const inventoryApi = {
   /** PUT /inventory/bulk-update */
   bulkUpdateStock: (updates: { id: string; new_stock: number }[]) =>
     apiClient.put<ApiMsg>("/inventory/bulk-update", { updates }).then((r) => r.data),
+
+  /** GET /categories */
+  getCategories: () =>
+    apiClient.get<ApiOk<{ id: string; name: string }[]>>("/categories").then((r) => r.data),
+
+  /** GET /suppliers */
+  getSuppliers: () =>
+    apiClient.get<ApiOk<{ id: string; name: string; contact_info?: string }[]>>("/suppliers").then((r) => r.data),
 };
 
 // ─── MEMBERS ─────────────────────────────────────────────────────────────────
@@ -105,7 +113,7 @@ export const membersApi = {
 
 export const transactionsApi = {
   /** GET /pos/products */
-  searchProducts: (params?: { search?: string }) =>
+  searchProducts: (params?: { search?: string; limit?: number }) =>
     apiClient.get<ApiOk<Product[]>>("/pos/products", { params }).then((r) => r.data),
 
   /** POST /pos/transactions */
@@ -145,6 +153,10 @@ export const transactionsApi = {
       alasan_retur: "CACAT_PABRIK",
       qty_diretur: data.quantity_returned,
     }).then((r) => r.data),
+
+  /** GET /transactions-all */
+  getAllTransactions: () =>
+    apiClient.get<{ success?: boolean; message?: string; data: any[] }>("/transactions-all").then((r) => r.data),
 };
 
 // ─── REPORTS ─────────────────────────────────────────────────────────────────
@@ -157,14 +169,21 @@ export const reportsApi = {
         ? { period: "custom", date_from: params.start_date, date_to: params.end_date }
         : { period: params.period ?? "this_month" },
     }).then((r) => r.data),
+
+  /** GET /finance/export/pdf */
+  exportPdf: (params: { date_from?: string; date_to?: string }) =>
+    apiClient.get("/finance/export/pdf", {
+      params,
+      responseType: "blob",
+    }).then((r) => r.data),
 };
 
 // ─── AUDIT LOGS ───────────────────────────────────────────────────────────────
 
 export const auditApi = {
   /** GET /audit/logs */
-  getLogs: () =>
-    apiClient.get<ApiOk<AuditLog[]>>("/audit/logs").then((r) => r.data),
+  getLogs: (params?: { startDate?: string; endDate?: string }) =>
+    apiClient.get<ApiOk<AuditLog[]>>("/audit/logs", { params }).then((r) => r.data),
 };
 
 // ─── EMPLOYEES ───────────────────────────────────────────────────────────────

@@ -50,13 +50,13 @@ const mockData: DashboardData = {
     total_terproses: 24500000,
   },
   daily_sales_chart: [
-    { hari: "Mon", nilai: 11000000 },
-    { hari: "Tue", nilai: 18000000 },
-    { hari: "Wed", nilai: 15000000 },
-    { hari: "Thu", nilai: 25000000 },
-    { hari: "Fri", nilai: 21000000 },
-    { hari: "Sat", nilai: 30000000 },
-    { hari: "Sun", nilai: 27000000 },
+    { hari: "Sen", nilai: 11000000 },
+    { hari: "Sel", nilai: 18000000 },
+    { hari: "Rab", nilai: 15000000 },
+    { hari: "Kam", nilai: 25000000 },
+    { hari: "Jum", nilai: 21000000 },
+    { hari: "Sab", nilai: 30000000 },
+    { hari: "Min", nilai: 27000000 },
   ],
 };
 
@@ -197,7 +197,7 @@ export default function DashboardPage() {
           {/* Chart */}
           <div className="col-span-2 page-card p-5">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold text-gray-800">Daily Sales Performance</h2>
+              <h2 className="font-semibold text-gray-800">Performa Penjualan Harian</h2>
               <button className="text-gray-400 hover:text-gray-600"><BarChart2 size={16} /></button>
             </div>
             <ResponsiveContainer width="100%" height={220}>
@@ -206,7 +206,7 @@ export default function DashboardPage() {
                 <XAxis dataKey="hari" tick={{ fontSize: 11, fill: "#9CA3AF" }} />
                 <YAxis tick={{ fontSize: 11, fill: "#9CA3AF" }} tickFormatter={(v) => `${v / 1000000}jt`} />
                 <Tooltip formatter={(v: number) => formatRupiah(v)} labelStyle={{ fontSize: 12 }} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-                <Line type="monotone" dataKey="nilai" stroke="#3B82F6" strokeWidth={2.5} dot={{ r: 4, fill: "#3B82F6" }} activeDot={{ r: 6 }} />
+                <Line type="monotone" dataKey="nilai" stroke="#3B82F6" strokeWidth={2.5} dot={{ r: 4, fill: "#3B82F6" }} activeDot={{ r: 6 }} isAnimationActive={true} animationDuration={1000} animationEasing="ease-out" />
               </LineChart>
             </ResponsiveContainer>
           </div>
