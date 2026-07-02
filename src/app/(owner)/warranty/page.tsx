@@ -10,6 +10,7 @@ export default function WarrantyPage() {
   const [transactionId, setTransactionId] = useState("");
   const [productId, setProductId] = useState("");
   const [qty, setQty] = useState(1);
+  const [reason, setReason] = useState("CACAT_PABRIK");
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
 
@@ -21,15 +22,17 @@ export default function WarrantyPage() {
     setSubmitting(true);
     try {
       await transactionsApi.returnProduct({
-        transaction_id: transactionId,
+        invoice_no: transactionId,
         product_id: productId,
-        quantity_returned: qty,
+        qty: qty,
+        reason: reason,
       });
       toast.success("Retur berhasil diproses!");
       setSuccess(true);
       setTransactionId("");
       setProductId("");
       setQty(1);
+      setReason("CACAT_PABRIK");
       setTimeout(() => setSuccess(false), 4000);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
@@ -65,17 +68,17 @@ export default function WarrantyPage() {
 
           <div className="space-y-4">
             <div>
-              <label className="form-label">ID Transaksi *</label>
+              <label className="form-label">No. Invoice *</label>
               <div className="relative">
                 <FileText size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
                   value={transactionId}
                   onChange={(e) => setTransactionId(e.target.value)}
-                  placeholder="uuid transaksi"
+                  placeholder="No. Invoice"
                   className="form-input pl-9 font-mono text-sm"
                 />
               </div>
-              <p className="text-xs text-gray-400 mt-1">UUID transaksi penjualan asli</p>
+              <p className="text-xs text-gray-400 mt-1">Nomor invoice transaksi penjualan asli</p>
             </div>
 
             <div>
@@ -101,6 +104,20 @@ export default function WarrantyPage() {
                 min={1}
                 className="form-input"
               />
+            </div>
+
+            <div>
+              <label className="form-label">Alasan Retur *</label>
+              <select
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                className="form-select"
+              >
+                <option value="CACAT_PABRIK">Cacat Pabrik</option>
+                <option value="SALAH_KIRIM">Salah Kirim</option>
+                <option value="KUALITAS_TIDAK_SESUAI">Kualitas Tidak Sesuai</option>
+                <option value="LAINNYA">Lainnya</option>
+              </select>
             </div>
           </div>
 

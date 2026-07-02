@@ -145,14 +145,8 @@ export const transactionsApi = {
   getTransaction: (transactionId: string) =>
     apiClient.get<ApiOk<unknown>>(`/pos/transactions/${transactionId}`).then((r) => r.data),
 
-  /** Legacy return endpoint is not exposed in routes; use warrantyApi for UI claims. */
   returnProduct: (data: ReturnRequest) =>
-    apiClient.post<ApiMsg>("/warranty/claims", {
-      invoice_id: data.transaction_id,
-      item_kode: data.product_id,
-      alasan_retur: "CACAT_PABRIK",
-      qty_diretur: data.quantity_returned,
-    }).then((r) => r.data),
+    apiClient.post<ApiMsg>("/warranty/claims", data).then((r) => r.data),
 
   /** GET /transactions-all */
   getAllTransactions: () =>

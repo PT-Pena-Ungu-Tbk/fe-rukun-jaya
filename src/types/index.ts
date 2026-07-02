@@ -102,9 +102,10 @@ export interface Transaction {
 }
 
 export interface ReturnRequest {
-  transaction_id: string;
+  invoice_no: string;
   product_id: string;
-  quantity_returned: number;
+  qty: number;
+  reason: string;
 }
 
 // ===== FINANCIAL REPORT =====

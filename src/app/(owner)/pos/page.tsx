@@ -276,13 +276,13 @@ export default function POSPage() {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Nama Barang</th><th>Kode SKU</th><th>Rak</th><th>Stok</th><th>Status</th>
+                    <th>Nama Barang</th><th>ID Barang</th><th>Kode SKU</th><th>Rak</th><th>Stok</th><th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loadingProducts ? (
                     <tr>
-                      <td colSpan={5} className="text-center py-8">
+                      <td colSpan={6} className="text-center py-8">
                         <div className="flex flex-col items-center justify-center gap-2">
                           <Loader2 className="animate-spin text-blue-600" size={20} />
                           <span className="text-xs text-gray-500">Memuat produk...</span>
@@ -291,7 +291,7 @@ export default function POSPage() {
                     </tr>
                   ) : filtered.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="text-center py-8 text-xs text-gray-400">
+                      <td colSpan={6} className="text-center py-8 text-xs text-gray-400">
                         Produk tidak ditemukan atau belum tersedia.
                       </td>
                     </tr>
@@ -299,6 +299,7 @@ export default function POSPage() {
                     filtered.map((p) => (
                       <tr key={p.id} onClick={() => addToCart(p)} className="cursor-pointer">
                         <td className="text-blue-600 font-medium">{p.name}</td>
+                        <td className="font-mono text-xs text-gray-400 select-all">{p.id}</td>
                         <td className="font-mono text-xs text-gray-500">{p.sku_code}</td>
                         <td className="text-gray-500 text-xs">{p.rack_location ?? "-"}</td>
                         <td className={`font-semibold ${p.current_stock < p.min_stock ? "text-amber-600" : "text-gray-800"}`}>{p.current_stock.toLocaleString("id-ID")}</td>
