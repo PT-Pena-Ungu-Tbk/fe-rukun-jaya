@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
 import QueryProvider from "@/components/providers/QueryProvider";
+import IdleLogoutProvider from "@/components/providers/IdleLogoutProvider";
 
 export const metadata: Metadata = {
   title: "POS Rukun Jaya",
@@ -20,7 +21,9 @@ export default function RootLayout({
     <html lang="id">
       <body>
         <QueryProvider>
-          {children}
+          <IdleLogoutProvider>
+            {children}
+          </IdleLogoutProvider>
           <Toaster position="top-right" />
         </QueryProvider>
       </body>

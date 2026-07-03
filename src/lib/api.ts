@@ -178,6 +178,9 @@ export const auditApi = {
   /** GET /audit/logs */
   getLogs: (params?: { startDate?: string; endDate?: string }) =>
     apiClient.get<ApiOk<AuditLog[]>>("/audit/logs", { params }).then((r) => r.data),
+  /** GET /audit/logs/:id */
+  getLogDetail: (id: string) =>
+    apiClient.get<ApiOk<any>>(`/audit/logs/${id}`).then((r) => r.data),
 };
 
 // ─── EMPLOYEES ───────────────────────────────────────────────────────────────

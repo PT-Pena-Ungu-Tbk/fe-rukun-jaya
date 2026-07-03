@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import TopNav from "@/components/layout/TopNav";
-import { Download, Calendar, Pencil, Trash2, LogIn, LogOut, RotateCcw, ChevronLeft, ChevronRight, Loader2, Plus } from "lucide-react";
+import { Download, Calendar, Pencil, Trash2, LogIn, LogOut, RotateCcw, ChevronLeft, ChevronRight, Loader2, Plus, Eye, X } from "lucide-react";
 import { auditApi } from "@/lib/api";
 import apiClient from "@/lib/axios";
 import toast from "react-hot-toast";
@@ -32,13 +32,13 @@ const activityConfig: Record<string, { label: string; bg: string; text: string; 
 
 const generateMonthOptions = () => {
   const options = [];
-  const now = new Date("2026-06-30T16:02:23+07:00");
+  const now = new Date();
   const monthNames = [
     "Januari", "Februari", "Maret", "April", "Mei", "Juni",
     "Juli", "Agustus", "September", "Oktober", "November", "Desember"
   ];
   
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < 24; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const year = d.getFullYear();
     const month = d.getMonth();
@@ -54,11 +54,19 @@ const generateMonthOptions = () => {
 };
 
 export default function AuditLogPage() {
-  const monthOptions = generateMonthOptions();
+  const monthOptions = [
+    { label: "Semua", startDate: undefined, endDate: undefined },
+    ...generateMonthOptions()
+  ];
   const [selectedMonth, setSelectedMonth] = useState(monthOptions[0]);
   const [logs, setLogs] = useState<AuditEntry[]>([]);
   const [totalItems, setTotalItems] = useState(0);
   const [loading, setLoading] = useState(true);
+
+  // Modal State
+  const [selectedLogId, setSelectedLogId] = useState<string | null>(null);
+  const [detailLog, setDetailLog] = useState<any | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -96,43 +104,180 @@ export default function AuditLogPage() {
       });
   }, [selectedMonth]);
 
-  const renderChangesPayload = (payload: any) => {
-    if (!payload) return <span className="text-gray-400">-</span>;
+  // Fetch log details on selectedLogId change
+  useEffect(() => {
+    if (!selectedLogId) {
+      setDetailLog(null);
+      return;
+    }
+    
+    setLoadingDetail(true);
+    auditApi.getLogDetail(selectedLogId)
+      .then((res) => {
+        setDetailLog(res.data);
+      })
+      .catch((err) => {
+        console.error(err);
+        toast.error("Gagal memuat detail log audit.");
+        setSelectedLogId(null);
+      })
+      .finally(() => {
+        setLoadingDetail(false);
+      });
+  }, [selectedLogId]);
+
+  const renderChangesSummary = (log: AuditEntry) => {
+    if (log.aktivitas === "LOGIN") {
+      return (
+        <div className="flex flex-col items-start gap-1">
+          <span className="text-xs text-gray-500 font-medium">Sesi login pengguna dimulai</span>
+        </div>
+      );
+    }
+    if (log.aktivitas === "LOGOUT") {
+      return (
+        <div className="flex flex-col items-start gap-1">
+          <span className="text-xs text-gray-500 font-medium">Sesi login pengguna berakhir</span>
+        </div>
+      );
+    }
+
+    if (!log.payload) {
+      return <span className="text-gray-400 text-xs">-</span>;
+    }
+
+    try {
+      const data = typeof log.payload === "string" ? JSON.parse(log.payload) : log.payload;
+      let summaryText = "Melakukan perubahan data";
+
+      if (data && (data.old !== undefined || data.new !== undefined)) {
+        const keys = Object.keys({ ...data.old, ...data.new }).filter(
+          (key) => JSON.stringify(data.old?.[key]) !== JSON.stringify(data.new?.[key])
+        );
+        if (keys.length > 0) {
+          summaryText = `Mengubah ${keys.length} kolom: ${keys.join(", ")}`;
+        } else {
+          summaryText = "Menyimpan data tanpa perubahan";
+        }
+      } else if (log.aktivitas === "CREATE") {
+        summaryText = "Membuat data baru";
+      } else if (log.aktivitas === "DELETE") {
+        summaryText = "Menghapus data";
+      } else if (data) {
+        const keys = Object.keys(data);
+        if (keys.length > 0) {
+          summaryText = `Data perubahan: ${keys.slice(0, 3).join(", ")}${keys.length > 3 ? "..." : ""}`;
+        }
+      }
+
+      return (
+        <div className="flex flex-col items-start gap-1.5 max-w-full">
+          <span className="text-xs text-gray-600 font-medium truncate max-w-full block" title={summaryText}>
+            {summaryText}
+          </span>
+          <button
+            onClick={() => setSelectedLogId(log.id)}
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 text-[11px] text-blue-600 hover:bg-blue-100 hover:text-blue-700 font-semibold transition-colors duration-150 border border-blue-100/50 cursor-pointer"
+          >
+            <Eye size={11} />
+            <span>Lihat Detail</span>
+          </button>
+        </div>
+      );
+    } catch (err) {
+      return (
+        <div className="flex flex-col items-start gap-1.5">
+          <span className="text-xs text-gray-600 font-medium truncate max-w-xs block">
+            {String(log.payload)}
+          </span>
+          <button
+            onClick={() => setSelectedLogId(log.id)}
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 text-[11px] text-blue-600 hover:bg-blue-100 hover:text-blue-700 font-semibold transition-colors duration-150 border border-blue-100/50 cursor-pointer"
+          >
+            <Eye size={11} />
+            <span>Lihat Detail</span>
+          </button>
+        </div>
+      );
+    }
+  };
+
+  const renderDetailChanges = (payload: any) => {
+    if (!payload) return <div className="p-4 text-center text-xs text-gray-400">Tidak ada detail perubahan data.</div>;
+    
     try {
       const data = typeof payload === "string" ? JSON.parse(payload) : payload;
       
       if (data && (data.old !== undefined || data.new !== undefined)) {
         const keys = Object.keys({ ...data.old, ...data.new });
+        const changedKeys = keys.filter(key => JSON.stringify(data.old?.[key]) !== JSON.stringify(data.new?.[key]));
+        
+        if (changedKeys.length === 0) {
+          return (
+            <div className="p-4 text-center text-xs text-gray-500">
+              Data disimpan tanpa ada perubahan pada kolom.
+            </div>
+          );
+        }
+
         return (
-          <div className="space-y-1 text-xs">
-            {keys.map((key) => {
+          <div className="divide-y divide-gray-100">
+            <div className="grid grid-cols-3 bg-gray-50 px-4 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+              <div>Nama Kolom</div>
+              <div>Sebelum (Old)</div>
+              <div>Sesudah (New)</div>
+            </div>
+            {changedKeys.map((key) => {
               const oldVal = data.old?.[key];
               const newVal = data.new?.[key];
-              if (oldVal === newVal) return null;
+              
               return (
-                <div key={key} className="flex flex-wrap gap-1.5 items-center">
-                  <span className="font-semibold text-gray-600">{key}:</span>
-                  <span className="line-through text-gray-400 bg-red-50 px-1 rounded">{JSON.stringify(oldVal)}</span>
-                  <span className="text-gray-400">→</span>
-                  <span className="text-blue-600 font-medium bg-blue-50 px-1 rounded">{JSON.stringify(newVal)}</span>
+                <div key={key} className="grid grid-cols-3 px-4 py-3 text-xs items-center hover:bg-gray-50/50 transition-colors">
+                  <div className="font-semibold text-gray-700 break-all pr-2">{key}</div>
+                  <div className="break-all pr-2">
+                    {oldVal !== undefined ? (
+                      <span className="inline-block bg-red-50 text-red-700 border border-red-100 rounded px-2 py-1 font-mono text-[11px]">
+                        {typeof oldVal === "object" ? JSON.stringify(oldVal) : String(oldVal)}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400 italic">kosong</span>
+                    )}
+                  </div>
+                  <div className="break-all">
+                    {newVal !== undefined ? (
+                      <span className="inline-block bg-green-50 text-green-700 border border-green-100 rounded px-2 py-1 font-mono text-[11px]">
+                        {typeof newVal === "object" ? JSON.stringify(newVal) : String(newVal)}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400 italic">dihapus</span>
+                    )}
+                  </div>
                 </div>
               );
             })}
           </div>
         );
       }
-      
+
       return (
-        <pre className="text-xs text-gray-600 font-mono bg-gray-50 p-2 rounded max-w-full overflow-x-auto whitespace-pre-wrap break-all">
-          {JSON.stringify(data, null, 2)}
-        </pre>
+        <div className="p-4 bg-slate-900 text-slate-100 font-mono text-xs overflow-x-auto whitespace-pre rounded-b-xl max-h-[300px]">
+          <code>{JSON.stringify(data, null, 2)}</code>
+        </div>
       );
     } catch (err) {
-      return <span className="text-gray-600">{String(payload)}</span>;
+      return (
+        <div className="p-4 font-mono text-xs text-gray-700 break-all bg-gray-50">
+          {String(payload)}
+        </div>
+      );
     }
   };
 
   const handleExport = async () => {
+    if (!selectedMonth.startDate || !selectedMonth.endDate) {
+      toast.error("Silakan pilih bulan tertentu terlebih dahulu untuk mengekspor data Excel.", { id: "export-audit" });
+      return;
+    }
     try {
       toast.loading("Mengunduh audit log...", { id: "export-audit" });
       const response = await apiClient.get("/audit/logs/export/excel", {
@@ -181,7 +326,7 @@ export default function AuditLogPage() {
                   const opt = monthOptions.find(o => o.label === e.target.value);
                   if (opt) setSelectedMonth(opt);
                 }}
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none bg-white font-medium"
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none bg-white font-medium cursor-pointer"
               >
                 {monthOptions.map((opt) => (
                   <option key={opt.label} value={opt.label}>
@@ -195,7 +340,7 @@ export default function AuditLogPage() {
 
           {/* Spacer + Export */}
           <div className="ml-auto">
-            <button onClick={handleExport} className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm hover:bg-blue-700 transition-colors font-semibold shadow-sm">
+            <button onClick={handleExport} className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm hover:bg-blue-700 transition-colors font-semibold shadow-sm cursor-pointer">
               <Download size={14} /> Ekspor Excel
             </button>
           </div>
@@ -226,7 +371,7 @@ export default function AuditLogPage() {
               ) : logs.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-5 py-10 text-center text-slate-400 text-sm">
-                    Tidak ada aktivitas log audit yang tercatat pada bulan ini.
+                    Tidak ada aktivitas log audit yang tercatat.
                   </td>
                 </tr>
               ) : (
@@ -268,7 +413,7 @@ export default function AuditLogPage() {
 
                       {/* Detail Perubahan */}
                       <td className="px-5 py-4">
-                        {renderChangesPayload(log.payload)}
+                        {renderChangesSummary(log)}
                       </td>
                     </tr>
                   );
@@ -291,6 +436,99 @@ export default function AuditLogPage() {
           </div>
         </div>
       </main>
+
+      {/* Modal Detail Log Audit */}
+      {selectedLogId && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl border border-gray-100 flex flex-col max-h-[85vh] animate-scale-up overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center">
+                  <Calendar size={16} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-gray-900">Detail Log Audit</h3>
+                  <p className="text-xs text-gray-500">Informasi lengkap aktivitas dan perubahan sistem</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setSelectedLogId(null)} 
+                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {loadingDetail ? (
+                <div className="flex flex-col items-center justify-center py-12 gap-3">
+                  <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                  <span className="text-sm text-gray-500 font-medium">Memuat detail log...</span>
+                </div>
+              ) : detailLog ? (
+                <>
+                  {/* Grid Metadata */}
+                  <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                    <div>
+                      <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Aktor / User ID</p>
+                      <p className="text-sm font-semibold text-gray-800 mt-0.5">{detailLog.user_id}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Waktu Aktivitas</p>
+                      <p className="text-sm font-semibold text-gray-800 mt-0.5">
+                        {new Date(detailLog.created_at).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })}{" "}
+                        {new Date(detailLog.created_at).toLocaleTimeString("id-ID")} WIB
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Aktivitas</p>
+                      <div className="mt-1">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold ${
+                          activityConfig[detailLog.action]?.bg || "bg-gray-100"
+                        } ${
+                          activityConfig[detailLog.action]?.text || "text-gray-700"
+                        }`}>
+                          {detailLog.action}
+                        </span>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Tabel / Target</p>
+                      <p className="text-sm font-semibold text-gray-800 mt-0.5">
+                        {detailLog.table_name || "-"} {detailLog.record_id ? `(#${detailLog.record_id})` : ""}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Changes Payload Section */}
+                  <div>
+                    <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Detail Perubahan Data</h4>
+                    <div className="border border-gray-205 rounded-xl overflow-hidden bg-white shadow-sm">
+                      {renderDetailChanges(detailLog.changes_payload)}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="text-center py-8 text-gray-500 text-sm">
+                  Gagal memuat detail log audit.
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex justify-end px-6 py-4 border-t border-gray-100 bg-gray-50/50">
+              <button 
+                onClick={() => setSelectedLogId(null)} 
+                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl text-sm font-semibold transition-colors cursor-pointer"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

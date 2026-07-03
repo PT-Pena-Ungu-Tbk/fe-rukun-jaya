@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import TopNav from "@/components/layout/TopNav";
 import Link from "next/link";
-import { Download, Upload, Save, Filter, RefreshCw, Loader2, ChevronRight } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Download, Save, Filter, RefreshCw, Loader2, ChevronRight } from "lucide-react";
 import toast from "react-hot-toast";
 import { inventoryApi } from "@/lib/api";
 
@@ -16,18 +17,10 @@ interface BulkItem {
   keterangan: string;
 }
 
-const mockItems: BulkItem[] = [
-  { item_id: "INV-001", nama_barang: "Semen Tiga Roda 50kg (PPC)", stok_sistem: 450, stok_fisik_baru: 455, kode_rak: "A1-22", keterangan: "Audit Stok Rutin" },
-  { item_id: "INV-042", nama_barang: "Kayu Meranti 4×6×4m", stok_sistem: 120, stok_fisik_baru: 118, kode_rak: "Y-04", keterangan: "Barang Rusak" },
-  { item_id: "INV-109", nama_barang: "Cat Dulux Catylac Putih 5kg", stok_sistem: 32, stok_fisik_baru: 32, kode_rak: "C3-01", keterangan: "-" },
-  { item_id: "INV-215", nama_barang: "Pipa PVC Wavin 3 Inch", stok_sistem: 75, stok_fisik_baru: 80, kode_rak: "B-12", keterangan: "Koreksi Pengiriman" },
-  { item_id: "INV-012", nama_barang: "Baja Ringan Kencana C75.75", stok_sistem: 2000, stok_fisik_baru: 1950, kode_rak: "Outdoor-A", keterangan: "Salah Hitung Input" },
-];
-
 export default function BulkUpdatePage() {
+  const router = useRouter();
   const [items, setItems] = useState<BulkItem[]>([]);
   const [saving, setSaving] = useState(false);
-  const [gudang, setGudang] = useState("gudang_utama");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -70,6 +63,7 @@ export default function BulkUpdatePage() {
         new_stock: item.stok_fisik_baru,
       })));
       toast.success(`${items.length} barang berhasil diperbarui!`);
+      router.push("/inventory");
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
       toast.error(msg ?? "Gagal memperbarui stok");
@@ -100,9 +94,8 @@ export default function BulkUpdatePage() {
             <p className="text-sm text-gray-500 mt-0.5">Sinkronisasi stok fisik gudang dengan sistem secara efisien.</p>
           </div>
           <div className="flex items-center gap-2">
-            <button className="btn-secondary text-sm"><Download size={14} /> Unduh Template Excel</button>
-            <button className="btn-secondary text-sm"><Upload size={14} /> Upload File Perubahan</button>
-            <button onClick={handleSave} disabled={saving} className="btn-primary text-sm">
+            <button className="btn-secondary text-sm cursor-pointer"><Download size={14} /> Unduh Template Excel</button>
+            <button onClick={handleSave} disabled={saving} className="btn-primary text-sm cursor-pointer">
               {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
               Simpan Semua Perubahan
             </button>
@@ -131,18 +124,12 @@ export default function BulkUpdatePage() {
           <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <span>Menampilkan 1-{items.length} dari {items.length} item</span>
-              <span className="text-gray-300">|</span>
-              <select value={gudang} onChange={(e) => setGudang(e.target.value)}
-                className="form-select text-sm py-1.5 border-blue-200 text-blue-700 font-medium">
-                <option value="gudang_utama">Gudang Utama</option>
-                <option value="gudang_b">Gudang B</option>
-              </select>
             </div>
             <div className="flex items-center gap-2">
-              <button className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors">
+              <button className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors cursor-pointer">
                 <Filter size={15} />
               </button>
-              <button className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors">
+              <button className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors cursor-pointer">
                 <RefreshCw size={15} />
               </button>
             </div>
