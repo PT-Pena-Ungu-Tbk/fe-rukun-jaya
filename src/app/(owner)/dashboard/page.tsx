@@ -8,58 +8,6 @@ import { formatRupiah } from "@/lib/utils";
 import { dashboardApi } from "@/lib/api";
 import type { DashboardData } from "@/types";
 
-// ── Mock fallback ─────────────────────────────────────────────────────────────
-const mockData: DashboardData = {
-  summary: {
-    pendapatan_hari_ini: 24500000,
-    pendapatan_kemarin: 22600000,
-    persentase_perubahan_pendapatan: 8.4,
-    profit_kotor: 5200000,
-    profit_kemarin: 4990000,
-    persentase_perubahan_profit: 4.2,
-    volume_transaksi: 142,
-    volume_transaksi_kemarin: 144,
-    persentase_perubahan_volume: -1.2,
-    jumlah_pelanggan: 84,
-    jumlah_pelanggan_kemarin: 80,
-    persentase_perubahan_pelanggan: 5.0,
-  },
-  peringatan_stok: [
-    { sku: "SG-50-01", nama: "Semen Gresik 50kg", stok: 2, satuan: "Sak", status: "CRITICAL" },
-    { sku: "BB-10-SNI", nama: "Besi Beton 10mm SNI", stok: 16, satuan: "Btg", status: "LOW" },
-    { sku: "CT-DLX-W25", nama: "Cat Tembok Dulux Putih 25kg", stok: 0, satuan: "Klg", status: "EMPTY" },
-  ],
-  produk_terlaris: [
-    { nama: "Semen Tiga Roda", unit_terjual: 420, total_nilai: 21000000 },
-    { nama: "Besi Beton 10mm", unit_terjual: 315, total_nilai: 38000000 },
-    { nama: "Paku Payung", unit_terjual: 150, total_nilai: 3000000 },
-    { nama: "Triplek 9mm", unit_terjual: 88, total_nilai: 7000000 },
-    { nama: "Cat Avitex Putih", unit_terjual: 54, total_nilai: 12000000 },
-  ],
-  aktivitas_terbaru: [
-    { tipe: "INVOICE_PRINT", deskripsi: "Invoice #TRX-99824 dicetak", waktu: "" },
-    { tipe: "STOCK_UPDATE", deskripsi: "Update stok Cat Tembok", waktu: "" },
-    { tipe: "MEMBER_NEW", deskripsi: "Member VIP baru terdaftar", waktu: "" },
-    { tipe: "TRX_CANCEL", deskripsi: "Pembatalan nota #TRX-99810", waktu: "" },
-    { tipe: "LOGIN", deskripsi: "Kasir #2 mulai shift", waktu: "" },
-  ],
-  metode_pembayaran: {
-    tunai: { persentase: 45, total: 11025000 },
-    transfer_bank: { persentase: 40, total: 9800000 },
-    qris: { persentase: 15, total: 3675000 },
-    total_terproses: 24500000,
-  },
-  daily_sales_chart: [
-    { hari: "Sen", nilai: 11000000 },
-    { hari: "Sel", nilai: 18000000 },
-    { hari: "Rab", nilai: 15000000 },
-    { hari: "Kam", nilai: 25000000 },
-    { hari: "Jum", nilai: 21000000 },
-    { hari: "Sab", nilai: 30000000 },
-    { hari: "Min", nilai: 27000000 },
-  ],
-};
-
 const activityIconMap: Record<string, React.ElementType> = {
   INVOICE_PRINT: Printer,
   STOCK_UPDATE: BarChart2,
@@ -83,9 +31,13 @@ export default function DashboardPage() {
 
   useEffect(() => {
     setLoading(true);
+
     dashboardApi.getOverview()
       .then(setData)
-      .catch(() => setData(null))
+      .catch((err) => {
+        console.error("Gagal memuat dashboard:", err);
+        setData(null);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -298,24 +250,22 @@ export default function DashboardPage() {
               <FileText size={15} className="text-gray-400" />
             </div>
             {[
-              { label: "Tunai", pct: metode_pembayaran.tunai.persentase, color: "bg-blue-600" },
-              { label: "Transfer Bank", pct: metode_pembayaran.transfer_bank.persentase, color: "bg-gray-400" },
-              { label: "QRIS / E-Wallet", pct: metode_pembayaran.qris.persentase, color: "bg-amber-400" },
+              { label: "Tunai/Cash", pct: metode_pembayaran?.tunai?.persentase || 0, color: "bg-blue-600" },
             ].map((m) => (
               <div key={m.label} className="mb-3">
                 <div className="flex justify-between text-xs text-gray-600 mb-1">
                   <span>{m.label}</span>
                   <span className="font-semibold">{m.pct}%</span>
                 </div>
-                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <div className={`h-full ${m.color} rounded-full transition-all duration-500`} style={{ width: `${m.pct}%` }} />
+                <div className="w-full bg-gray-100 rounded-full h-1.5">
+                  <div className={`h-1.5 rounded-full ${m.color}`} style={{ width: `${m.pct}%` }}></div>
                 </div>
               </div>
             ))}
             <div className="mt-4 pt-3 border-t border-gray-100">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Total Terproses:</span>
-                <span className="font-bold text-gray-900">{formatRupiah(metode_pembayaran.total_terproses)}</span>
+                <span className="font-bold text-gray-900">{formatRupiah(metode_pembayaran.tunai.total)}</span>
               </div>
             </div>
           </div>

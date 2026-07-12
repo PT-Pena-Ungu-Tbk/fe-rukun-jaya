@@ -38,6 +38,10 @@ import type {
   VipMembersListResponse,
   CreateVipMemberRequest,
   VipMember,
+  Employee,
+  EmployeePayload,
+  Supplier,
+  SupplierPayload,
 } from "@/types";
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
@@ -105,6 +109,10 @@ export const membersApi = {
     apiClient.get<ApiOk<VipMembersListResponse>>("/members/vip", { params }).then((r) => r.data.data),
   createVipMember: (data: CreateVipMemberRequest) =>
     apiClient.post<ApiOk<VipMember>>("/members/vip", data).then((r) => r.data.data),
+  updateMember: (id: string, data: { nama?: string; phone_number?: string; level?: string; poin?: number }) =>
+    apiClient.put<ApiOk<VipMember>>(`/members/vip/${id}`, data).then((r) => r.data),
+  deleteMember: (id: string) =>
+    apiClient.delete<ApiMsg>(`/members/vip/${id}`).then((r) => r.data),
   redeemPoints: (memberId: string, data: { poin_ditukar: number; jenis_penukaran: string; transaction_id?: string }) =>
     apiClient.post<ApiMsg & { sisa_poin?: number }>(`/members/vip/${memberId}/redeem`, data).then((r) => r.data),
 };
@@ -145,12 +153,15 @@ export const transactionsApi = {
   getTransaction: (transactionId: string) =>
     apiClient.get<ApiOk<unknown>>(`/pos/transactions/${transactionId}`).then((r) => r.data),
 
+  lookupWarranty: (invoiceNo: string) =>
+    apiClient.get<ApiOk<any>>("/warranty/lookup", { params: { invoice_no: invoiceNo } }).then((r) => r.data.data),
+
   returnProduct: (data: ReturnRequest) =>
     apiClient.post<ApiMsg>("/warranty/claims", data).then((r) => r.data),
 
   /** GET /transactions-all */
   getAllTransactions: () =>
-    apiClient.get<{ success?: boolean; message?: string; data: any[] }>("/transactions-all").then((r) => r.data),
+    apiClient.get<ApiOk<TransactionHistory[]>>("/transactions/all").then((r) => r.data),
 };
 
 // ─── REPORTS ─────────────────────────────────────────────────────────────────
@@ -185,22 +196,6 @@ export const auditApi = {
 
 // ─── EMPLOYEES ───────────────────────────────────────────────────────────────
 
-export interface EmployeePayload {
-  name: string;
-  email: string;
-  password?: string;
-  role: "CASHIER" | "OWNER";
-}
-
-export interface Employee {
-  id: string;
-  name: string;
-  email: string;
-  role: "CASHIER" | "OWNER";
-  is_active?: boolean;
-  created_at?: string;
-}
-
 export const employeesApi = {
   /** GET /staff */
   getList: () =>
@@ -220,6 +215,25 @@ export const employeesApi = {
 
   toggleAccess: (id: string) =>
     apiClient.patch<{ staff_id: string; is_active: boolean; message: string }>(`/staff/${id}/toggle-access`).then((r) => r.data),
+};
+
+// ─── SUPPLIER ───────────────────
+export const suppliersApi = {
+  /** GET /suppliers */
+  getList: () =>
+    apiClient.get<ApiOk<Supplier[]>>("/suppliers").then((r) => r.data),
+
+  /** POST /suppliers */
+  create: (data: SupplierPayload) =>
+    apiClient.post<ApiOk<Supplier>>("/suppliers", data).then((r) => r.data),
+
+  /** PUT /suppliers/:id */
+  update: (id: string, data: Partial<SupplierPayload>) =>
+    apiClient.put<ApiOk<Supplier>>(`/suppliers/${id}`, data).then((r) => r.data),
+
+  /** DELETE /suppliers/:id */
+  delete: (id: string) =>
+    apiClient.delete<ApiMsg>(`/suppliers/${id}`).then((r) => r.data),
 };
 
 // ─── BACKWARD COMPAT (halaman lama / dashboard pakai mock) ───────────────────

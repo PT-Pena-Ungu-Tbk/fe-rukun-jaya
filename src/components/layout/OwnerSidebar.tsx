@@ -79,7 +79,7 @@ export default function OwnerSidebar() {
 
       {/* Footer */}
       <div className="px-4 py-4 border-t border-gray-100">
-        <p className="text-[10px] text-gray-400 text-center">v1.0.0 · Rukun Jaya POS</p>
+        <p className="text-[10px] text-gray-400 text-center">v1.5.0 · Rukun Jaya POS</p>
       </div>
     </aside>
   );

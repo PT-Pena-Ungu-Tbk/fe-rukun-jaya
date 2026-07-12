@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import TopNav from "@/components/layout/TopNav";
-import { Search, Minus, Plus, Trash2, X, CheckCircle, Printer, Download, ShoppingCart, Loader2 } from "lucide-react";
+import { Search, Minus, Plus, Trash2, X, CheckCircle, Printer, Download, ShoppingCart, Loader2, Filter } from "lucide-react";
 import { formatRupiah } from "@/lib/utils";
 import toast from "react-hot-toast";
 import { inventoryApi, membersApi, transactionsApi } from "@/lib/api";
@@ -16,6 +16,8 @@ const paymentMethods = ["CASH"] as const;
 export default function POSPage() {
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState("Semua");
+  const [categories, setCategories] = useState<{id: string; name: string}[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState("Semua Kategori");
   const [products, setProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -51,11 +53,20 @@ export default function POSPage() {
   }, []);
 
   useEffect(() => {
+    inventoryApi.getCategories()
+      .then(res => setCategories(res.data || []))
+      .catch(err => console.error("Gagal memuat kategori", err));
+  }, []);
+
+  useEffect(() => {
     const timer = setTimeout(() => fetchProducts(search, activeFilter), 350);
     return () => clearTimeout(timer);
   }, [search, activeFilter, fetchProducts]);
 
   const filtered = products.filter((p) => {
+    if (selectedCategory !== "Semua Kategori" && p.category !== selectedCategory) {
+      return false;
+    }
     if (!search) return true;
     const s = search.toLowerCase();
     if (activeFilter === "SKU") return p.sku_code.toLowerCase().includes(s);
@@ -258,6 +269,23 @@ export default function POSPage() {
           <div className="flex-1 flex flex-col page-card overflow-hidden">
             {/* Search + Filter */}
             <div className="flex items-center gap-2 p-4 border-b border-gray-100">
+              <div className="relative">
+                <Filter size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500" />
+                <select 
+                  value={selectedCategory} 
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  className="form-input pl-8 pr-7 py-1.5 text-sm appearance-none cursor-pointer bg-white min-w-[140px]"
+                >
+                  <option value="Semua Kategori">Semua Kategori</option>
+                  {categories.map(c => (
+                    <option key={c.id} value={c.name}>{c.name}</option>
+                  ))}
+                </select>
+                <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 text-[10px]">▼</div>
+              </div>
+
+              <div className="h-6 w-px bg-gray-200 mx-1"></div>
+
               {filterTabs.map((t) => (
                 <button key={t} onClick={() => setActiveFilter(t)}
                   className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${activeFilter === t ? "bg-blue-600 text-white" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"}`}>
@@ -276,7 +304,7 @@ export default function POSPage() {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Nama Barang</th><th>ID Barang</th><th>Kode SKU</th><th>Rak</th><th>Stok</th><th>Status</th>
+                    <th>Kategori</th><th>Nama Barang</th><th>Kode SKU</th><th>Rak</th><th>Stok</th><th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -298,9 +326,9 @@ export default function POSPage() {
                   ) : (
                     filtered.map((p) => (
                       <tr key={p.id} onClick={() => addToCart(p)} className="cursor-pointer">
+                        <td className="text-blue-600 font-medium">{p.category}</td>
                         <td className="text-blue-600 font-medium">{p.name}</td>
-                        <td className="font-mono text-xs text-gray-400 select-all">{p.id}</td>
-                        <td className="font-mono text-xs text-gray-500">{p.sku_code}</td>
+                        <td className="font-mono text-xs text-gray-400 select-all">{p.sku_code}</td>
                         <td className="text-gray-500 text-xs">{p.rack_location ?? "-"}</td>
                         <td className={`font-semibold ${p.current_stock < p.min_stock ? "text-amber-600" : "text-gray-800"}`}>{p.current_stock.toLocaleString("id-ID")}</td>
                         <td>{statusBadge(p.current_stock === 0 ? "OUT_OF_STOCK" : p.current_stock <= p.min_stock ? "LOW_STOCK" : "IN_STOCK")}</td>
@@ -384,7 +412,7 @@ export default function POSPage() {
               <div className="p-3 border-b border-gray-100">
                 <p className="text-xs font-semibold text-gray-600 mb-2">Metode Pembayaran</p>
                 <div className="w-full py-2 text-center text-xs font-bold rounded-lg bg-green-50 text-green-700 border border-green-200">
-                  💵 Tunai (Cash Only)
+                  💵 Tunai
                 </div>
               </div>
             </div>

@@ -9,30 +9,6 @@ import { formatRupiah } from "@/lib/utils";
 import { inventoryApi } from "@/lib/api";
 import type { Product } from "@/types";
 
-const mockProduct = {
-  item_id: "INV-001",
-  nama_barang: "Semen Tiga Roda 50kg (PPC)",
-  sku: "SMT-001",
-  kondisi: "Baru",
-  kategori: "Material Bangunan",
-  satuan: "Sak",
-  berat: "50 kg",
-  dimensi: "70 × 40 × 20 cm",
-  supplier: "PT. Indocement Tunggal",
-  exp_date: "2025-12-31",
-  garansi: "6 Bulan (Kualitas Produk)",
-  deskripsi: "Semen Portland Pozzolan Cement (PPC) cocok untuk konstruksi umum, tahan terhadap sulfat.",
-  harga_beli: 55000,
-  harga_jual: 65000,
-  stok_total: 455,
-  nilai_inventaris: 24975000,
-  gambar: [],
-  distribusi: [
-    { lokasi: "Gudang Utama - Rak A1-22", stok: 420, min_stok: 50 },
-    { lokasi: "Etalase Toko Depan", stok: 35, min_stok: 10 },
-  ],
-};
-
 export default function ProductDetailPage() {
   const { id } = useParams();
   const [product, setProduct] = useState<Product | null>(null);

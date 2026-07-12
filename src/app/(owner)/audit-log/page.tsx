@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import TopNav from "@/components/layout/TopNav";
-import { Download, Calendar, Pencil, Trash2, LogIn, LogOut, RotateCcw, ChevronLeft, ChevronRight, Loader2, Plus, Eye, X } from "lucide-react";
+import { Download, Calendar, Pencil, Trash2, LogIn, LogOut, RotateCcw, ChevronLeft, ChevronRight, Loader2, Plus, Eye, X, Info } from "lucide-react";
 import { auditApi } from "@/lib/api";
 import apiClient from "@/lib/axios";
 import toast from "react-hot-toast";
@@ -62,6 +62,8 @@ export default function AuditLogPage() {
   const [logs, setLogs] = useState<AuditEntry[]>([]);
   const [totalItems, setTotalItems] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   // Modal State
   const [selectedLogId, setSelectedLogId] = useState<string | null>(null);
@@ -259,10 +261,34 @@ export default function AuditLogPage() {
         );
       }
 
+      const keys = Object.keys(data);
+      if (keys.length > 0) {
+        return (
+          <div className="p-5 bg-white rounded-b-xl">
+            {data.message && (
+              <div className="mb-5 p-4 bg-blue-50/50 border border-blue-100 rounded-xl text-sm font-medium text-blue-900 leading-relaxed shadow-sm">
+                <span className="flex items-center gap-2 mb-1.5 text-blue-600 font-bold text-[11px] uppercase tracking-wider">
+                  <Info size={14} /> Pesan Aktivitas
+                </span>
+                {data.message}
+              </div>
+            )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+              {keys.filter(k => k !== "message").map(key => (
+                <div key={key} className="flex flex-col border-b border-gray-50 pb-2">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">{key.replace(/_/g, ' ')}</span>
+                  <span className="text-sm font-semibold text-gray-800 break-words">
+                    {typeof data[key] === "object" ? JSON.stringify(data[key]) : String(data[key])}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      }
+
       return (
-        <div className="p-4 bg-slate-900 text-slate-100 font-mono text-xs overflow-x-auto whitespace-pre rounded-b-xl max-h-[300px]">
-          <code>{JSON.stringify(data, null, 2)}</code>
-        </div>
+        <div className="p-4 text-center text-xs text-gray-400">Tidak ada detail tambahan.</div>
       );
     } catch (err) {
       return (
@@ -317,25 +343,24 @@ export default function AuditLogPage() {
         {/* Filter Bar */}
         <div className="bg-white border border-gray-200 rounded-2xl px-5 py-4 mb-4 shadow-sm flex items-end gap-4 animate-slide-up">
           {/* Dropdown Perbulan */}
-          <div className="w-64">
+          <div className="w-128">
             <label className="text-xs font-semibold text-gray-500 mb-1.5 block">Pilih Bulan</label>
-            <div className="relative">
-              <select
-                value={selectedMonth.label}
-                onChange={(e) => {
-                  const opt = monthOptions.find(o => o.label === e.target.value);
-                  if (opt) setSelectedMonth(opt);
-                }}
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none bg-white font-medium cursor-pointer"
-              >
-                {monthOptions.map((opt) => (
-                  <option key={opt.label} value={opt.label}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">▾</span>
-            </div>
+          <div className="flex items-center gap-1.5 border border-gray-200 bg-white rounded-lg px-3 py-2 text-sm text-gray-700">
+            <span className="text-gray-400"></span>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="outline-none bg-transparent text-sm text-gray-700 w-32"
+            />
+            <span className="text-gray-400">-</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="outline-none bg-transparent text-sm text-gray-700 w-32"
+            />
+          </div>
           </div>
 
           {/* Spacer + Export */}
@@ -422,18 +447,7 @@ export default function AuditLogPage() {
             </tbody>
           </table>
 
-          {/* Footer */}
-          <div className="flex items-center justify-between px-5 py-3.5 border-t border-gray-100 bg-white">
-            <span className="text-sm text-gray-500">Menampilkan 1-{logs.length} dari {totalItems} data</span>
-            <div className="flex items-center gap-1">
-              <button className="w-8 h-8 flex items-center justify-center border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50 transition-colors">
-                <ChevronLeft size={15} />
-              </button>
-              <button className="w-8 h-8 flex items-center justify-center border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50 transition-colors">
-                <ChevronRight size={15} />
-              </button>
-            </div>
-          </div>
+
         </div>
       </main>
 
