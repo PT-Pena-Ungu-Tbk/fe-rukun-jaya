@@ -82,17 +82,17 @@ export default function WarrantyPage() {
             </div>
 
             <div>
-              <label className="form-label">ID Produk *</label>
+              <label className="form-label">Kode SKU Barang *</label>
               <div className="relative">
                 <Package size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
                   value={productId}
                   onChange={(e) => setProductId(e.target.value)}
-                  placeholder="uuid produk"
+                  placeholder="Kode SKU"
                   className="form-input pl-9 font-mono text-sm"
                 />
               </div>
-              <p className="text-xs text-gray-400 mt-1">UUID produk yang akan diretur</p>
+              <p className="text-xs text-gray-400 mt-1">Kode SKU produk yang akan diretur</p>
             </div>
 
             <div>

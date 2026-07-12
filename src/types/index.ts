@@ -22,7 +22,7 @@ export interface ApiMessage {
 }
 
 // ===== AUTH =====
-export type UserRole = "OWNER" | "CASHIER" | "WAREHOUSE_ADMIN" | "MANAGER";
+export type UserRole = "OWNER" | "CASHIER";
 
 /** Internal user shape stored in cookies */
 export interface User {
@@ -85,7 +85,7 @@ export interface CheckoutRequest {
   discount_type: "NOMINAL" | "PERCENTAGE";
   discount_value: number;
   cash_paid: number;
-  payment_method?: "CASH" | "TRANSFER" | "QRIS" | "CREDIT";
+  payment_method?: "CASH";
   payment_reference?: string;
   customer_name?: string;
   items: { product_id: string; quantity: number }[];
@@ -148,9 +148,6 @@ export interface DashboardData {
   aktivitas_terbaru: { tipe: string; deskripsi: string; waktu: string }[];
   metode_pembayaran: {
     tunai: { persentase: number; total: number };
-    transfer_bank: { persentase: number; total: number };
-    qris: { persentase: number; total: number };
-    total_terproses: number;
   };
   daily_sales_chart: { hari: string; nilai: number }[];
 }
@@ -176,7 +173,7 @@ export interface PosTransactionItem {
 
 export interface PosCheckoutRequest {
   items: PosTransactionItem[];
-  payment_method: "CASH" | "TRANSFER" | "QRIS" | "CREDIT";
+  payment_method: "CASH";
   jumlah_bayar?: number; // wajib jika CASH
   vip_phone?: string;
   diskon_persen?: number;
@@ -416,6 +413,24 @@ export interface EditStaffRequest {
   is_active?: boolean;
 }
 
+// ===== EMPLOYEE =====
+export interface EmployeePayload {
+  name: string;
+  email: string;
+  password?: string;
+  role: "CASHIER" | "OWNER";
+}
+
+export interface Employee {
+  id: string;
+  name: string;
+  email: string;
+  role: "CASHIER" | "OWNER";
+  is_active?: boolean;
+  created_at?: string;
+}
+
+
 // ===== VIP MEMBERS =====
 export interface VipMember {
   member_id: string;
@@ -445,32 +460,38 @@ export interface CreateVipMemberRequest {
   poin_awal?: number;
 }
 
-// ===== AUDIT LOG =====
+// ===== AUDIT LOG (sesuai response backend: id, user_id, action, table_name, record_id, changes_payload) =====
 export interface AuditLog {
-  user: {
-    id: string;
+  id: string;
+  user_id: string;
+  action: string;
+  table_name?: string;
+  record_id?: string;
+  changes_payload?: any;
+  created_at: string;
+  // Fields yang dihitung dari frontend (dari audit-log/page.tsx)
+  user?: {
     nama: string;
     jabatan: string;
-    avatar_url?: string;
+    avatar?: string;
+    color?: string;
   };
-  waktu: string;
-  aktivitas: "EDIT_HARGA" | "HAPUS_BARANG" | "LOGIN" | "RETUR_PEMBELIAN";
-  detail_perubahan: string;
-  nilai_lama?: string;
-  nilai_baru?: string;
-  ip_address?: string;
+  tanggal?: string;
+  waktu?: string;
+  aktivitas?: string;
+  payload?: any;
 }
 
-// ===== LEGACY COMPAT (used in old pages) =====
+// ===== LEGACY COMPAT — Supplier (sesuai schema Prisma: name, contact_info) =====
 export interface Supplier {
   id: string;
-  supplier_id: string;
-  vendor_name: string;
-  category: string;
-  primary_contact: string;
-  phone: string;
-  status: "Active" | "Inactive" | "On Hold" | string;
-  rating: number;
+  name: string;
+  contact_info?: string;
+}
+
+export interface SupplierPayload {
+  name: string;
+  contact_info?: string;
 }
 
 export interface TransactionHistory {
@@ -498,10 +519,10 @@ export interface Product {
   id: string;
   sku_code: string;
   name: string;
-  category?: string;
-  supplier?: string;
-  category_id?: string;
-  supplier_id?: string;
+  category: string;
+  supplier: string;
+  category_id: string;
+  supplier_id: string;
   buy_price: string;
   sell_price: string;
   current_stock: number;

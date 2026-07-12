@@ -7,19 +7,19 @@ import toast from "react-hot-toast";
 import { employeesApi, type Employee } from "@/lib/api";
 
 interface Staff {
-  id: string; employee_id: string; full_name: string;
-  jabatan: string; login_time: string; is_active: boolean;
-  email?: string;
+  id: string; employee_id: string; employee_code: string; full_name: string;
+  jabatan: string; email?: string; is_active: boolean; created_at?: string;
 }
 
 const toStaff = (e: Employee): Staff => ({
   id: e.id,
   employee_id: e.id,
+  employee_code: (e as any).employee_code || "-",
   full_name: e.name,
-  jabatan: e.role === "OWNER" ? "Owner" : "Cashier",
-  login_time: "-",
+  jabatan: e.role === "OWNER" ? "Owner" : "Kasir",
   is_active: e.is_active ?? true,
   email: e.email,
+  created_at: e.created_at,
 });
 
 const jabatanBadge = (j: string) => {
@@ -56,7 +56,9 @@ export default function UserManagementPage() {
   }, []);
 
   const filtered = staff.filter((s) =>
-    s.full_name.toLowerCase().includes(search.toLowerCase()) || s.employee_id.includes(search)
+    s.full_name.toLowerCase().includes(search.toLowerCase()) ||
+    s.employee_code.toLowerCase().includes(search.toLowerCase()) ||
+    (s.email ?? "").toLowerCase().includes(search.toLowerCase())
   );
 
   const toggleAccess = (id: string) => {
@@ -151,12 +153,12 @@ export default function UserManagementPage() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>ID Karyawan</th>
+                  <th>Kode Karyawan</th>
                   <th>Nama Lengkap</th>
+                  <th>Email</th>
                   <th>Jabatan</th>
-                  <th>Login</th>
-                  <th>Access</th>
-                  <th>Action</th>
+                  <th>Akses</th>
+                  <th>Aksi</th>
                 </tr>
               </thead>
               <tbody>
@@ -178,10 +180,14 @@ export default function UserManagementPage() {
                 ) : (
                   filtered.map((s) => (
                     <tr key={s.id} className="animate-fade-in">
-                    <td className="font-mono text-sm font-semibold text-gray-600">{s.employee_id}</td>
-                    <td className="font-semibold text-gray-900">{s.full_name}</td>
+                    <td className="font-mono text-sm font-bold text-blue-700">{s.employee_code}</td>
+                    <td>
+                      <div className="flex flex-col">
+                        <span className="font-semibold text-gray-900">{s.full_name}</span>
+                      </div>
+                    </td>
+                    <td className="text-gray-500 text-sm">{s.email ?? "-"}</td>
                     <td>{jabatanBadge(s.jabatan)}</td>
-                    <td className="text-gray-500 text-sm">{s.login_time}</td>
                     <td>
                       <button onClick={() => toggleAccess(s.id)}
                         className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${s.is_active ? "bg-green-500" : "bg-red-400"}`}>

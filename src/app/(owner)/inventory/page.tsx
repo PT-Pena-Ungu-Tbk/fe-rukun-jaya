@@ -41,6 +41,12 @@ export default function InventoryPage() {
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, filterStatus, filterKategori]);
 
   useEffect(() => {
     setLoading(true);
@@ -70,8 +76,12 @@ export default function InventoryPage() {
       (filterStatus === "Stok Habis" && item.current_stock === 0) ||
       (filterStatus === "Stok Rendah" && item.current_stock > 0 && item.current_stock <= item.min_stock) ||
       (filterStatus === "Stok Tersedia" && item.current_stock > item.min_stock);
-    return matchSearch && matchStatus;
+    const matchKategori = filterKategori === "Semua Kategori" || item.category === filterKategori;
+    return matchSearch && matchStatus && matchKategori;
   });
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
+  const paginatedItems = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const localSummary = {
     stokHabis: items.filter((i) => i.current_stock === 0).length,
@@ -182,8 +192,10 @@ export default function InventoryPage() {
             <div className="flex items-center gap-2">
               <select value={filterKategori} onChange={(e) => setFilterKategori(e.target.value)}
                 className="form-select text-sm py-2">
-                <option>Semua Kategori</option>
-                <option>Semen</option><option>Besi</option><option>Cat</option><option>Pipa</option>
+                <option value="Semua Kategori">Semua Kategori</option>
+                {categories.map(c => (
+                  <option key={c.id} value={c.name}>{c.name}</option>
+                ))}
               </select>
               <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
                 className="form-select text-sm py-2">
@@ -207,7 +219,6 @@ export default function InventoryPage() {
               <thead>
                 <tr>
                   <th><input type="checkbox" className="rounded" /></th>
-                  <th>ID</th>
                   <th>Kode SKU</th>
                   <th>Nama Barang</th>
                   <th>Stok</th>
@@ -234,10 +245,9 @@ export default function InventoryPage() {
                     </td>
                   </tr>
                 ) : (
-                  filtered.map((item) => (
+                  paginatedItems.map((item) => (
                     <tr key={item.id} className="animate-fade-in">
                     <td><input type="checkbox" className="rounded" /></td>
-                    <td className="font-mono text-xs text-gray-500">{item.id}</td>
                     <td className="font-mono text-xs text-gray-750 font-semibold">{item.sku_code}</td>
                     <td>
                       <Link href={`/inventory/${item.id}`} className={`font-medium hover:underline ${item.current_stock === 0 ? "text-red-600" : "text-gray-800"}`}>
@@ -277,15 +287,40 @@ export default function InventoryPage() {
 
           {/* Pagination */}
           <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 text-sm text-gray-500">
-            <span>Menampilkan 1-{filtered.length} dari 1,248 barang</span>
+            <span>
+              Menampilkan {filtered.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1}-
+              {Math.min(currentPage * itemsPerPage, filtered.length)} dari {filtered.length} barang
+            </span>
             <div className="flex items-center gap-1">
-              <button className="w-7 h-7 rounded text-xs hover:bg-gray-100 text-gray-500">‹</button>
-              {[1, 2, 3].map((p) => (
-                <button key={p} className={`w-7 h-7 rounded text-xs ${p === 1 ? "bg-blue-600 text-white" : "hover:bg-gray-100 text-gray-600"}`}>{p}</button>
-              ))}
-              <span className="w-7 h-7 flex items-center justify-center text-xs text-gray-400">...</span>
-              <button className="w-7 h-7 rounded text-xs hover:bg-gray-100 text-gray-600">250</button>
-              <button className="w-7 h-7 rounded text-xs hover:bg-gray-100 text-gray-500">›</button>
+              <button 
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                className="w-7 h-7 rounded text-xs hover:bg-gray-100 text-gray-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                ‹
+              </button>
+              
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let startPage = Math.max(1, currentPage - 2);
+                if (startPage + 4 > totalPages) {
+                  startPage = Math.max(1, totalPages - 4);
+                }
+                const p = startPage + i;
+                return (
+                  <button 
+                    key={p} 
+                    onClick={() => setCurrentPage(p)}
+                    className={`w-7 h-7 rounded text-xs ${p === currentPage ? "bg-blue-600 text-white" : "hover:bg-gray-100 text-gray-600"}`}>
+                    {p}
+                  </button>
+                );
+              })}
+              
+              <button 
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                className="w-7 h-7 rounded text-xs hover:bg-gray-100 text-gray-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                ›
+              </button>
             </div>
           </div>
         </div>

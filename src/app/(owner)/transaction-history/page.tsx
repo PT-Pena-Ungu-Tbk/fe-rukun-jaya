@@ -138,7 +138,7 @@ export default function TransactionHistoryPage() {
         <div className="flex items-center gap-2 mb-3 animate-slide-up stagger-3">
           {/* Date Range */}
           <div className="flex items-center gap-1.5 border border-gray-200 bg-white rounded-lg px-3 py-2 text-sm text-gray-700">
-            <span className="text-gray-400">📅</span>
+            <span className="text-gray-400"></span>
             <input
               type="date"
               value={dateFrom}
