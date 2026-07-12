@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
@@ -56,7 +57,7 @@ export default function OwnerSidebar() {
     <aside className="w-56 min-h-screen bg-white border-r border-gray-200 flex flex-col animate-slide-left">
       {/* Logo */}
       <div className="flex items-center gap-3 px-5 py-5 border-b border-gray-100">
-        <img src={logoImg.src} alt="Logo Toko Rukun Jaya" className="w-9 h-9 object-contain flex-shrink-0" />
+        <Image src={logoImg} alt="Logo Toko Rukun Jaya" className="w-9 h-9 object-contain flex-shrink-0" priority />
         <div>
           <p className="text-sm font-bold text-gray-900 leading-tight">Toko Rukun Jaya</p>
           <p className="text-[10px] text-gray-400">Enterprise POS</p>

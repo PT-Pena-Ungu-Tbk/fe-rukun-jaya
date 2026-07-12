@@ -3,7 +3,12 @@
 import { useState, useEffect } from "react";
 import TopNav from "@/components/layout/TopNav";
 import { TrendingUp, TrendingDown, FileText, Users, BarChart2, AlertTriangle, Clock, Printer, XCircle, LogIn, Package, Loader2 } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import dynamic from "next/dynamic";
+
+const DashboardChart = dynamic(() => import("@/components/dashboard/DashboardChart"), {
+  ssr: false,
+  loading: () => <div className="w-full h-[220px] bg-gray-50 animate-pulse rounded-lg flex items-center justify-center text-sm text-gray-400">Memuat Grafik...</div>
+});
 import { formatRupiah } from "@/lib/utils";
 import { dashboardApi } from "@/lib/api";
 import type { DashboardData } from "@/types";
@@ -152,15 +157,7 @@ export default function DashboardPage() {
               <h2 className="font-semibold text-gray-800">Performa Penjualan Harian</h2>
               <button className="text-gray-400 hover:text-gray-600"><BarChart2 size={16} /></button>
             </div>
-            <ResponsiveContainer width="100%" height={220}>
-              <LineChart data={daily_sales_chart}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#F0F0F0" />
-                <XAxis dataKey="hari" tick={{ fontSize: 11, fill: "#9CA3AF" }} />
-                <YAxis tick={{ fontSize: 11, fill: "#9CA3AF" }} tickFormatter={(v) => `${v / 1000000}jt`} />
-                <Tooltip formatter={(v: number) => formatRupiah(v)} labelStyle={{ fontSize: 12 }} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-                <Line type="monotone" dataKey="nilai" stroke="#3B82F6" strokeWidth={2.5} dot={{ r: 4, fill: "#3B82F6" }} activeDot={{ r: 6 }} isAnimationActive={true} animationDuration={1000} animationEasing="ease-out" />
-              </LineChart>
-            </ResponsiveContainer>
+            <DashboardChart data={daily_sales_chart} />
           </div>
 
           {/* Stock Alerts */}
