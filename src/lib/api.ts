@@ -106,8 +106,7 @@ export const membersApi = {
   verifyMember: (phone: string) =>
     apiClient.get<ApiOk<Member>>("/members/verify", { params: { phone } }).then((r) => r.data),
   getVipMembers: (params?: { level?: string; q?: string; page?: number; limit?: number }) =>
-    // Backend returns { stats, items } directly without data wrapper
-    apiClient.get<VipMembersListResponse>("/members/vip", { params }).then((r) => r.data),
+    apiClient.get<ApiOk<VipMembersListResponse>>("/members/vip", { params }).then((r) => r.data.data),
   createVipMember: (data: CreateVipMemberRequest) =>
     apiClient.post<ApiOk<VipMember>>("/members/vip", data).then((r) => r.data.data),
   updateMember: (id: string, data: { nama?: string; phone_number?: string; level?: string; poin?: number }) =>
@@ -154,12 +153,15 @@ export const transactionsApi = {
   getTransaction: (transactionId: string) =>
     apiClient.get<ApiOk<unknown>>(`/pos/transactions/${transactionId}`).then((r) => r.data),
 
+  lookupWarranty: (invoiceNo: string) =>
+    apiClient.get<ApiOk<any>>("/warranty/lookup", { params: { invoice_no: invoiceNo } }).then((r) => r.data.data),
+
   returnProduct: (data: ReturnRequest) =>
     apiClient.post<ApiMsg>("/warranty/claims", data).then((r) => r.data),
 
   /** GET /transactions-all */
   getAllTransactions: () =>
-    apiClient.get<{ success?: boolean; message?: string; data: any[] }>("/transactions-all").then((r) => r.data),
+    apiClient.get<ApiOk<TransactionHistory[]>>("/transactions/all").then((r) => r.data),
 };
 
 // ─── REPORTS ─────────────────────────────────────────────────────────────────

@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import TopNav from "@/components/layout/TopNav";
 import { Plus, Pencil, Trash2, X, Loader2, AlertTriangle } from "lucide-react";
 import toast from "react-hot-toast";
-import { employeesApi, type Employee } from "@/lib/api";
+import { employeesApi } from "@/lib/api";
+import type { Employee } from "@/types";
 
 interface Staff {
   id: string; employee_id: string; employee_code: string; full_name: string;

@@ -53,7 +53,7 @@ export default function POSPage() {
   }, []);
 
   useEffect(() => {
-    transactionsApi.getCategories()
+    inventoryApi.getCategories()
       .then(res => setCategories(res.data || []))
       .catch(err => console.error("Gagal memuat kategori", err));
   }, []);

@@ -447,18 +447,7 @@ export default function AuditLogPage() {
             </tbody>
           </table>
 
-          {/* Footer */}
-          <div className="flex items-center justify-between px-5 py-3.5 border-t border-gray-100 bg-white">
-            <span className="text-sm text-gray-500">Menampilkan 1-{logs.length} dari {totalItems} data</span>
-            <div className="flex items-center gap-1">
-              <button className="w-8 h-8 flex items-center justify-center border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50 transition-colors">
-                <ChevronLeft size={15} />
-              </button>
-              <button className="w-8 h-8 flex items-center justify-center border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50 transition-colors">
-                <ChevronRight size={15} />
-              </button>
-            </div>
-          </div>
+
         </div>
       </main>
 

@@ -23,6 +23,8 @@ export default function TransactionHistoryPage() {
   const [rawTransactions, setRawTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const fetchTransactions = () => {
     setLoading(true);
@@ -70,7 +72,10 @@ export default function TransactionHistoryPage() {
     return true;
   });
 
-  const mappedTransactions = filteredTransactions.map((t, idx) => {
+  const totalPages = Math.max(1, Math.ceil(filteredTransactions.length / itemsPerPage));
+  const paginatedTransactions = filteredTransactions.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  const mappedTransactions = paginatedTransactions.map((t, idx) => {
     const d = new Date(t.created_at);
     const dateStr = isNaN(d.getTime()) ? "-" : d.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
     const timeStr = isNaN(d.getTime()) ? "-" : d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB";
@@ -242,14 +247,44 @@ export default function TransactionHistoryPage() {
               </tbody>
             </table>
 
-            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 text-sm text-gray-500">
-              <span>Menampilkan 1 sampai {mappedTransactions.length} dari {mappedTransactions.length} data</span>
-              <div className="flex items-center gap-1">
-                <button className="w-8 h-8 flex items-center justify-center border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-500 text-xs">‹</button>
-                <button className="w-8 h-8 flex items-center justify-center rounded-lg text-xs font-medium bg-blue-600 text-white">1</button>
-                <button className="w-8 h-8 flex items-center justify-center border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-500 text-xs">›</button>
-              </div>
+          {/* Pagination */}
+          <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 text-sm text-gray-500">
+            <span>
+              Menampilkan {filteredTransactions.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1}-
+              {Math.min(currentPage * itemsPerPage, filteredTransactions.length)} dari {filteredTransactions.length} transaksi
+            </span>
+            <div className="flex items-center gap-1">
+              <button 
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                className="w-7 h-7 rounded text-xs hover:bg-gray-100 text-gray-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                ‹
+              </button>
+              
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let startPage = Math.max(1, currentPage - 2);
+                if (startPage + 4 > totalPages) {
+                  startPage = Math.max(1, totalPages - 4);
+                }
+                const p = startPage + i;
+                return (
+                  <button 
+                    key={p} 
+                    onClick={() => setCurrentPage(p)}
+                    className={`w-7 h-7 rounded text-xs ${p === currentPage ? "bg-blue-600 text-white" : "hover:bg-gray-100 text-gray-600"}`}>
+                    {p}
+                  </button>
+                );
+              })}
+              
+              <button 
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                className="w-7 h-7 rounded text-xs hover:bg-gray-100 text-gray-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                ›
+              </button>
             </div>
+          </div>
           </div>
         </div>
       </main>

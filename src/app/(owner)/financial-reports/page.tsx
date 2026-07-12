@@ -18,6 +18,8 @@ export default function FinancialReportsPage() {
   const [dateTo, setDateTo] = useState("");
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   useEffect(() => {
     let apiPeriod: "this_month" | "last_month" | "custom" = "this_month";
@@ -86,6 +88,9 @@ export default function FinancialReportsPage() {
       t.invoice_no.toLowerCase().includes(term) ||
       (t.member_name || "").toLowerCase().includes(term);
   });
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
+  const paginatedTransactions = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   return (
     <div className="flex-1 flex flex-col min-h-screen">
@@ -193,7 +198,7 @@ export default function FinancialReportsPage() {
                     </td>
                   </tr>
                 ) : (
-                  filtered.map((t) => {
+                  paginatedTransactions.map((t) => {
                     const d = new Date(t.created_at);
                     const dateStr = isNaN(d.getTime()) ? "-" : d.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
                     const timeStr = isNaN(d.getTime()) ? "-" : d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB";
@@ -211,10 +216,42 @@ export default function FinancialReportsPage() {
               </tbody>
             </table>
           </div>
+          {/* Pagination */}
           <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 text-sm text-gray-500">
-            <span>Menampilkan 1-{filtered.length} dari {filtered.length} transaksi</span>
+            <span>
+              Menampilkan {filtered.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1}-
+              {Math.min(currentPage * itemsPerPage, filtered.length)} dari {filtered.length} transaksi
+            </span>
             <div className="flex items-center gap-1">
-              <button className="w-7 h-7 rounded text-xs bg-blue-600 text-white">1</button>
+              <button 
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                className="w-7 h-7 rounded text-xs hover:bg-gray-100 text-gray-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                ‹
+              </button>
+              
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let startPage = Math.max(1, currentPage - 2);
+                if (startPage + 4 > totalPages) {
+                  startPage = Math.max(1, totalPages - 4);
+                }
+                const p = startPage + i;
+                return (
+                  <button 
+                    key={p} 
+                    onClick={() => setCurrentPage(p)}
+                    className={`w-7 h-7 rounded text-xs ${p === currentPage ? "bg-blue-600 text-white" : "hover:bg-gray-100 text-gray-600"}`}>
+                    {p}
+                  </button>
+                );
+              })}
+              
+              <button 
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                className="w-7 h-7 rounded text-xs hover:bg-gray-100 text-gray-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                ›
+              </button>
             </div>
           </div>
         </div>
