@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import "./globals.css";
+
+const inter = Inter({ subsets: ["latin"], display: "swap" });
+
 import { Toaster } from "react-hot-toast";
 import QueryProvider from "@/components/providers/QueryProvider";
 import IdleLogoutProvider from "@/components/providers/IdleLogoutProvider";
@@ -19,7 +23,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="id">
-      <body>
+      <body className={inter.className}>
         <QueryProvider>
           <IdleLogoutProvider>
             {children}

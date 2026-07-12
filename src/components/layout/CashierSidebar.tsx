@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import {
   ShoppingCart,
@@ -36,7 +37,7 @@ export default function CashierSidebar() {
       {/* Logo */}
       <div className="px-4 py-5 border-b border-white/10">
         <div className="flex items-center gap-3">
-          <img src={logoImg.src} alt="Logo Toko Rukun Jaya" className="w-9 h-9 object-contain bg-white rounded-lg p-0.5 flex-shrink-0" />
+          <Image src={logoImg} alt="Logo Toko Rukun Jaya" className="w-9 h-9 object-contain bg-white rounded-lg p-0.5 flex-shrink-0" priority />
           <div>
             <p className="text-sm font-bold leading-tight">Toko Rukun Jaya</p>
             <p className="text-[10px] text-slate-400">Penjualan & Kasir</p>
