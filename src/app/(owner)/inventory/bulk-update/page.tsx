@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import TopNav from "@/components/layout/TopNav";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Download, Save, Filter, RefreshCw, Loader2, ChevronRight } from "lucide-react";
+import { Download, Upload, Save, Filter, RefreshCw, Loader2, ChevronRight } from "lucide-react";
 import toast from "react-hot-toast";
 import { inventoryApi } from "@/lib/api";
 
@@ -22,8 +22,9 @@ export default function BulkUpdatePage() {
   const [items, setItems] = useState<BulkItem[]>([]);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
+  const fetchItems = () => {
     setLoading(true);
     inventoryApi.getProducts()
       .then((res) => {
@@ -40,12 +41,12 @@ export default function BulkUpdatePage() {
           setItems([]);
         }
       })
-      .catch(() => {
-        setItems([]);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+      .catch(() => setItems([]))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchItems();
   }, []);
 
   const updateField = (id: string, field: keyof BulkItem, value: string | number) => {
@@ -70,6 +71,23 @@ export default function BulkUpdatePage() {
     } catch (err) {
       console.error(err);
       toast.error("Gagal mengunduh template Excel", { id: "download-template" });
+    }
+  };
+
+  const handleUploadExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      toast.loading("Mengunggah file...", { id: "upload-excel" });
+      await inventoryApi.uploadBulkUpdateExcel(file);
+      toast.success("Data stok berhasil diperbarui dari Excel!", { id: "upload-excel" });
+      fetchItems();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err?.response?.data?.message || "Gagal mengunggah file Excel", { id: "upload-excel" });
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
@@ -112,7 +130,9 @@ export default function BulkUpdatePage() {
             <p className="text-sm text-gray-500 mt-0.5">Sinkronisasi stok fisik gudang dengan sistem secara efisien.</p>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={handleDownloadTemplate} className="btn-secondary text-sm cursor-pointer"><Download size={14} /> Unduh Template Excel</button>
+            <input type="file" accept=".xlsx, .xls" ref={fileInputRef} className="hidden" onChange={handleUploadExcel} />
+            <button onClick={() => fileInputRef.current?.click()} className="btn-secondary text-sm cursor-pointer"><Upload size={14} /> Unggah Excel</button>
+            <button onClick={handleDownloadTemplate} className="btn-secondary text-sm cursor-pointer"><Download size={14} /> Unduh Template</button>
             <button onClick={handleSave} disabled={saving} className="btn-primary text-sm cursor-pointer">
               {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
               Simpan Semua Perubahan
