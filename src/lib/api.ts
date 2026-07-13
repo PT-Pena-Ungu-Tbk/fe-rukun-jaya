@@ -94,6 +94,15 @@ export const inventoryApi = {
   downloadBulkUpdateTemplate: () =>
     apiClient.get<Blob>("/inventory/bulk-update/template", { responseType: 'blob' }).then((r) => r.data),
 
+  /** POST /inventory/bulk-update/upload */
+  uploadBulkUpdateExcel: (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return apiClient.post<ApiMsg>("/inventory/bulk-update/upload", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }).then((r) => r.data);
+  },
+
   /** GET /categories */
   getCategories: () =>
     apiClient.get<ApiOk<{ id: string; name: string }[]>>("/categories").then((r) => r.data),
