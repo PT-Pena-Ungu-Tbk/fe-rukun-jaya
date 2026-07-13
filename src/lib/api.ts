@@ -90,6 +90,10 @@ export const inventoryApi = {
   bulkUpdateStock: (updates: { id: string; new_stock: number }[]) =>
     apiClient.put<ApiMsg>("/inventory/bulk-update", { updates }).then((r) => r.data),
 
+  /** GET /inventory/bulk-update/template */
+  downloadBulkUpdateTemplate: () =>
+    apiClient.get<Blob>("/inventory/bulk-update/template", { responseType: 'blob' }).then((r) => r.data),
+
   /** GET /categories */
   getCategories: () =>
     apiClient.get<ApiOk<{ id: string; name: string }[]>>("/categories").then((r) => r.data),
@@ -146,8 +150,13 @@ export const transactionsApi = {
     cashier_id?: string;
     date_from?: string;
     date_to?: string;
-  }) =>
-    apiClient.get<ApiOk<TransactionHistory[]>>("/transactions", { params }).then((r) => r.data),
+    sortBy?: string;
+  }) => {
+    const mappedParams: any = { ...params };
+    if (params?.date_from) mappedParams.startDate = params.date_from;
+    if (params?.date_to) mappedParams.endDate = params.date_to;
+    return apiClient.get<ApiOk<TransactionHistory[]>>("/transactions", { params: mappedParams }).then((r) => r.data);
+  },
 
   /** GET /pos/transactions/:transaction_id */
   getTransaction: (transactionId: string) =>
@@ -160,8 +169,8 @@ export const transactionsApi = {
     apiClient.post<ApiMsg>("/warranty/claims", data).then((r) => r.data),
 
   /** GET /transactions-all */
-  getAllTransactions: () =>
-    apiClient.get<ApiOk<TransactionHistory[]>>("/transactions/all").then((r) => r.data),
+  getAllTransactions: (params?: { startDate?: string; endDate?: string }) =>
+    apiClient.get<ApiOk<TransactionHistory[]>>("/transactions/all", { params }).then((r) => r.data),
 };
 
 // ─── REPORTS ─────────────────────────────────────────────────────────────────

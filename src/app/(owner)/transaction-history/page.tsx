@@ -20,6 +20,7 @@ export default function TransactionHistoryPage() {
   const [cashierFilter, setCashierFilter] = useState("Semua Kasir");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [sortBy, setSortBy] = useState("newest");
   const [rawTransactions, setRawTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -49,6 +50,7 @@ export default function TransactionHistoryPage() {
     setCashierFilter("Semua Kasir");
     setDateFrom("");
     setDateTo("");
+    setSortBy("newest");
   };
 
   const cashiers = Array.from(new Set(rawTransactions.map(t => t.cashier_name).filter(Boolean)));
@@ -70,6 +72,12 @@ export default function TransactionHistoryPage() {
       if (d > end) return false;
     }
     return true;
+  }).sort((a, b) => {
+    if (sortBy === "newest") return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    if (sortBy === "oldest") return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    if (sortBy === "highest") return Number(b.grand_total) - Number(a.grand_total);
+    if (sortBy === "lowest") return Number(a.grand_total) - Number(b.grand_total);
+    return 0;
   });
 
   const totalPages = Math.max(1, Math.ceil(filteredTransactions.length / itemsPerPage));
@@ -164,6 +172,13 @@ export default function TransactionHistoryPage() {
             {cashiers.map((cashier: any) => (
               <option key={cashier} value={cashier}>{cashier}</option>
             ))}
+          </select>
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}
+            className="border border-gray-200 bg-white rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="newest">Tanggal Terbaru</option>
+            <option value="oldest">Tanggal Terlama</option>
+            <option value="highest">Nominal Tertinggi</option>
+            <option value="lowest">Nominal Terendah</option>
           </select>
           <button onClick={resetFilters}
             className="ml-auto flex items-center gap-1.5 text-sm text-blue-600 hover:underline font-medium">
