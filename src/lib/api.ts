@@ -98,9 +98,8 @@ export const inventoryApi = {
   uploadBulkUpdateExcel: (file: File) => {
     const formData = new FormData();
     formData.append("file", file);
-    return apiClient.post<ApiMsg>("/inventory/bulk-update/upload", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    }).then((r) => r.data);
+    return apiClient.post<ApiMsg>("/inventory/bulk-update/upload", formData)
+      .then((r) => r.data);
   },
 
   /** GET /categories */
