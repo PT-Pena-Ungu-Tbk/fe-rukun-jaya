@@ -151,9 +151,15 @@ export default function POSPage() {
   };
 
   const printReceipt = () => {
-    const printWindow = window.open("", "_blank", "width=600,height=600");
-    if (!printWindow) {
-      toast.error("Gagal membuka jendela cetak. Pastikan pop-up diizinkan.");
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'absolute';
+    iframe.style.top = '-10000px';
+    document.body.appendChild(iframe);
+    
+    const doc = iframe.contentWindow?.document;
+    if (!doc) {
+      toast.error("Gagal menyiapkan dokumen cetak.");
+      document.body.removeChild(iframe);
       return;
     }
 
@@ -172,7 +178,7 @@ export default function POSPage() {
       </tr>
     `).join("");
 
-    printWindow.document.write(`
+    doc.write(`
       <html>
         <head>
           <title>Struk Belanja - Toko Rukun Jaya</title>
@@ -231,13 +237,21 @@ export default function POSPage() {
           <script>
             window.onload = function() {
               window.print();
-              setTimeout(function() { window.close(); }, 500);
             }
           </script>
         </body>
       </html>
     `);
-    printWindow.document.close();
+    doc.close();
+    
+    // Allow iframe to load content before printing
+    setTimeout(() => {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+      }, 1000);
+    }, 100);
   };
 
   const resetTransaction = () => {
@@ -569,9 +583,6 @@ export default function POSPage() {
             <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100">
               <button onClick={resetTransaction} className="btn-secondary">
                 <X size={14} /> Tutup
-              </button>
-              <button onClick={printReceipt} className="btn-secondary">
-                <Download size={14} /> Ekspor PDF
               </button>
               <button onClick={printReceipt} className="btn-primary">
                 <Printer size={14} /> Cetak Struk

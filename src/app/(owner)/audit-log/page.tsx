@@ -72,7 +72,7 @@ export default function AuditLogPage() {
 
   useEffect(() => {
     setLoading(true);
-    auditApi.getLogs({ startDate: selectedMonth.startDate, endDate: selectedMonth.endDate })
+    auditApi.getLogs({ startDate: dateFrom, endDate: dateTo })
       .then((res) => {
         const items = res.data ?? [];
         const mapped: AuditEntry[] = items.map((raw: any, idx: number) => {
@@ -104,7 +104,7 @@ export default function AuditLogPage() {
       .finally(() => {
         setLoading(false);
       });
-  }, [selectedMonth]);
+  }, [selectedMonth, dateFrom, dateTo]);
 
   // Fetch log details on selectedLogId change
   useEffect(() => {
@@ -300,24 +300,23 @@ export default function AuditLogPage() {
   };
 
   const handleExport = async () => {
-    if (!selectedMonth.startDate || !selectedMonth.endDate) {
-      toast.error("Silakan pilih bulan tertentu terlebih dahulu untuk mengekspor data Excel.", { id: "export-audit" });
-      return;
-    }
+    let start = dateFrom;
+    let end = dateTo;
+    
     try {
       toast.loading("Mengunduh audit log...", { id: "export-audit" });
       const response = await apiClient.get("/audit/logs/export/excel", {
         responseType: "blob",
         params: {
-          startDate: selectedMonth.startDate,
-          endDate: selectedMonth.endDate
+          startDate: start,
+          endDate: end
         }
       });
       const blob = new Blob([response.data], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", `Export_AuditLog_${selectedMonth.label.replace(" ", "_")}.xlsx`);
+      link.setAttribute("download", `Export_AuditLog_${start}_${end}.xlsx`);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -344,23 +343,22 @@ export default function AuditLogPage() {
         <div className="bg-white border border-gray-200 rounded-2xl px-5 py-4 mb-4 shadow-sm flex items-end gap-4 animate-slide-up">
           {/* Dropdown Perbulan */}
           <div className="w-128">
-            <label className="text-xs font-semibold text-gray-500 mb-1.5 block">Pilih Bulan</label>
-          <div className="flex items-center gap-1.5 border border-gray-200 bg-white rounded-lg px-3 py-2 text-sm text-gray-700">
-            <span className="text-gray-400"></span>
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className="outline-none bg-transparent text-sm text-gray-700 w-32"
-            />
-            <span className="text-gray-400">-</span>
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              className="outline-none bg-transparent text-sm text-gray-700 w-32"
-            />
-          </div>
+            <label className="text-xs font-semibold text-gray-500 mb-1.5 block">Rentang Tanggal</label>
+            <div className="flex items-center gap-1.5 border border-gray-200 bg-white rounded-lg px-3 py-2 text-sm text-gray-700">
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="outline-none bg-transparent text-sm text-gray-700 w-32"
+              />
+              <span className="text-gray-400">-</span>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="outline-none bg-transparent text-sm text-gray-700 w-32"
+              />
+            </div>
           </div>
 
           {/* Spacer + Export */}

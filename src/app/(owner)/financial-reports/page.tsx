@@ -38,10 +38,29 @@ export default function FinancialReportsPage() {
   }, [period, dateFrom, dateTo]);
 
   useEffect(() => {
-    transactionsApi.getAllTransactions()
+    let apiPeriod: "this_month" | "last_month" | "custom" = "this_month";
+    if (period === "Bulan Lalu") apiPeriod = "last_month";
+    if (period === "Kustom") apiPeriod = "custom";
+
+    let start = undefined;
+    let end = undefined;
+    if (apiPeriod === "custom" && dateFrom) start = new Date(dateFrom).toISOString();
+    if (apiPeriod === "custom" && dateTo) end = new Date(dateTo).toISOString();
+    if (apiPeriod === "this_month") {
+      const now = new Date();
+      start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      end = now.toISOString();
+    }
+    if (apiPeriod === "last_month") {
+      const now = new Date();
+      start = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
+      end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999).toISOString();
+    }
+
+    transactionsApi.getAllTransactions({ startDate: start, endDate: end })
       .then((res) => setTransactions(res?.data || []))
       .catch((err) => console.error("Gagal memuat transaksi:", err));
-  }, []);
+  }, [period, dateFrom, dateTo]);
 
   const handleDownloadPdf = async () => {
     try {

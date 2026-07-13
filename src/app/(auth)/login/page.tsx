@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, User, Lock, ArrowRight, Loader2 } from "lucide-react";
+import Image from "next/image";
 import { saveAuth } from "@/lib/auth";
 import { authApi } from "@/lib/api";
 import toast from "react-hot-toast";
@@ -53,7 +54,7 @@ export default function LoginPage() {
       {/* Left Panel */}
       <div className="w-[40%] bg-blue-600 flex flex-col justify-between p-10 animate-fade-in">
         <div className="flex items-center gap-3">
-          <img src={logoImg.src} alt="Logo Toko Rukun Jaya" className="w-12 h-12 object-contain bg-white rounded-2xl p-1 shadow-md" />
+          <Image src={logoImg} alt="Logo Toko Rukun Jaya" width={48} height={48} className="object-contain bg-white rounded-2xl p-1 shadow-md" />
           <span className="text-white font-bold text-xl">Toko Rukun Jaya</span>
         </div>
 

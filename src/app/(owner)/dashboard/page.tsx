@@ -155,7 +155,7 @@ export default function DashboardPage() {
           <div className="col-span-2 page-card p-5">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-semibold text-gray-800">Performa Penjualan Harian</h2>
-              <button className="text-gray-400 hover:text-gray-600"><BarChart2 size={16} /></button>
+              <button aria-label="Lihat Detail Grafik" className="text-gray-400 hover:text-gray-600"><BarChart2 size={16} /></button>
             </div>
             <DashboardChart data={daily_sales_chart} />
           </div>

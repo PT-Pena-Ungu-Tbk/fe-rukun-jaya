@@ -55,6 +55,24 @@ export default function BulkUpdatePage() {
   const selisihSignifikan = items.filter((i) => Math.abs(i.stok_fisik_baru - i.stok_sistem) / (i.stok_sistem || 1) > 0.1).length;
   const stokMenipis = items.filter((i) => i.stok_fisik_baru < 20).length;
 
+  const handleDownloadTemplate = async () => {
+    try {
+      toast.loading("Mengunduh template...", { id: "download-template" });
+      const blob = await inventoryApi.downloadBulkUpdateTemplate();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `Template_Bulk_Update_${Date.now()}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast.success("Template berhasil diunduh!", { id: "download-template" });
+    } catch (err) {
+      console.error(err);
+      toast.error("Gagal mengunduh template Excel", { id: "download-template" });
+    }
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -94,7 +112,7 @@ export default function BulkUpdatePage() {
             <p className="text-sm text-gray-500 mt-0.5">Sinkronisasi stok fisik gudang dengan sistem secara efisien.</p>
           </div>
           <div className="flex items-center gap-2">
-            <button className="btn-secondary text-sm cursor-pointer"><Download size={14} /> Unduh Template Excel</button>
+            <button onClick={handleDownloadTemplate} className="btn-secondary text-sm cursor-pointer"><Download size={14} /> Unduh Template Excel</button>
             <button onClick={handleSave} disabled={saving} className="btn-primary text-sm cursor-pointer">
               {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
               Simpan Semua Perubahan
