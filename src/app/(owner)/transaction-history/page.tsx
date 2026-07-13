@@ -168,7 +168,7 @@ export default function TransactionHistoryPage() {
           </div>
           <select value={cashierFilter} onChange={(e) => setCashierFilter(e.target.value)}
             className="border border-gray-200 bg-white rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option value="All Cashiers">Semua Kasir</option>
+            <option value="Semua Kasir">Semua Kasir</option>
             {cashiers.map((cashier: any) => (
               <option key={cashier} value={cashier}>{cashier}</option>
             ))}
