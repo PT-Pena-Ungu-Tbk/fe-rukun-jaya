@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import TopNav from "@/components/layout/TopNav";
-import { Download, Plus, RotateCcw, MoreVertical, Loader2 } from "lucide-react";
+import { Download, Plus, RotateCcw, MoreVertical, Loader2, X, Printer } from "lucide-react";
 import { formatRupiah } from "@/lib/utils";
 import { transactionsApi } from "@/lib/api";
 import apiClient from "@/lib/axios";
@@ -25,6 +25,7 @@ export default function TransactionHistoryPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedTx, setSelectedTx] = useState<any | null>(null);
   const itemsPerPage = 10;
 
   const fetchTransactions = () => {
@@ -46,11 +47,16 @@ export default function TransactionHistoryPage() {
     fetchTransactions();
   }, []);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [cashierFilter, dateFrom, dateTo, sortBy]);
+
   const resetFilters = () => {
     setCashierFilter("Semua Kasir");
     setDateFrom("");
     setDateTo("");
     setSortBy("newest");
+    setCurrentPage(1);
   };
 
   const cashiers = Array.from(new Set(rawTransactions.map(t => t.cashier_name).filter(Boolean)));
@@ -102,6 +108,7 @@ export default function TransactionHistoryPage() {
       cashier: t.cashier_name || "-",
       items: itemsSummary,
       amount: Number(t.grand_total || 0),
+      raw: t,
     };
   });
 
@@ -251,8 +258,12 @@ export default function TransactionHistoryPage() {
                           </span>
                         </td>
                         <td className="px-4 py-4">
-                          <button className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors">
+                          <button 
+                            onClick={() => setSelectedTx(t)}
+                            title="Lihat Detail Transaksi"
+                            className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex items-center gap-1 text-xs font-medium cursor-pointer">
                             <MoreVertical size={15} />
+                            <span>Detail</span>
                           </button>
                         </td>
                       </tr>
@@ -303,6 +314,91 @@ export default function TransactionHistoryPage() {
           </div>
         </div>
       </main>
+
+      {/* Detail Transaksi Modal */}
+      {selectedTx && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 modal-overlay p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl modal-content overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50">
+              <div>
+                <h3 className="text-base font-bold text-gray-900">Rincian Transaksi #{selectedTx.invoice_no}</h3>
+                <p className="text-xs text-gray-500">{selectedTx.dateTime}</p>
+              </div>
+              <button onClick={() => setSelectedTx(null)} className="text-gray-400 hover:text-gray-600">
+                <X size={18} />
+              </button>
+            </div>
+            
+            <div className="px-6 py-5 space-y-4 max-h-[70vh] overflow-y-auto">
+              <div className="grid grid-cols-2 gap-4 text-xs bg-blue-50/50 border border-blue-100 rounded-xl p-3.5">
+                <div>
+                  <span className="text-gray-400 block mb-0.5">Kasir</span>
+                  <span className="font-semibold text-gray-800">{selectedTx.cashier}</span>
+                </div>
+                <div>
+                  <span className="text-gray-400 block mb-0.5">Pelanggan</span>
+                  <span className="font-semibold text-gray-800">{selectedTx.customer} {selectedTx.customerType ? `(${selectedTx.customerType})` : ""}</span>
+                </div>
+                <div>
+                  <span className="text-gray-400 block mb-0.5">Metode Pembayaran</span>
+                  <span className="font-semibold text-gray-800">{selectedTx.raw?.payment_method || "CASH"}</span>
+                </div>
+                <div>
+                  <span className="text-gray-400 block mb-0.5">Status</span>
+                  <span className="font-semibold text-green-600">SUKSES</span>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Item Belanja</h4>
+                <div className="border border-gray-100 rounded-xl overflow-hidden divide-y divide-gray-100 text-xs">
+                  {selectedTx.raw?.items && selectedTx.raw.items.length > 0 ? (
+                    selectedTx.raw.items.map((item: any, idx: number) => (
+                      <div key={idx} className="flex justify-between items-center p-3 hover:bg-gray-50">
+                        <div>
+                          <p className="font-medium text-gray-800">{item.product_name}</p>
+                          <p className="text-gray-400 text-[11px]">{formatRupiah(Number(item.unit_price))} x {item.quantity}</p>
+                        </div>
+                        <p className="font-semibold text-gray-900">{formatRupiah(Number(item.subtotal))}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="p-3 text-gray-400 text-center">{selectedTx.items}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="border-t border-gray-100 pt-3 space-y-1.5 text-xs">
+                {selectedTx.raw?.subtotal != null && (
+                  <div className="flex justify-between text-gray-500">
+                    <span>Subtotal</span>
+                    <span>{formatRupiah(Number(selectedTx.raw.subtotal))}</span>
+                  </div>
+                )}
+                {selectedTx.raw?.discount_value > 0 && (
+                  <div className="flex justify-between text-amber-600">
+                    <span>Diskon</span>
+                    <span>-{formatRupiah(Number(selectedTx.raw.discount_value))}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-base font-bold text-gray-900 pt-1">
+                  <span>Grand Total</span>
+                  <span className="text-blue-600">{formatRupiah(selectedTx.amount)}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50">
+              <button onClick={() => setSelectedTx(null)} className="btn-secondary text-xs py-2">
+                Tutup
+              </button>
+              <button onClick={() => { window.print(); }} className="btn-primary text-xs py-2">
+                <Printer size={14} /> Cetak Struk
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
