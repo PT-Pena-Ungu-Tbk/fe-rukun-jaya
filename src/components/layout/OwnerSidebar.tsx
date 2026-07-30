@@ -14,6 +14,7 @@ import {
   ClipboardList,
   BarChart3,
   ShieldAlert,
+  Building2,
 } from "lucide-react";
 
 import { getUser } from "@/lib/auth";
@@ -23,6 +24,7 @@ const navItems = [
   { href: "/dashboard",           label: "Dasbor",             icon: LayoutDashboard },
   { href: "/pos",                  label: "Penjualan",           icon: ShoppingCart },
   { href: "/inventory",            label: "Inventaris",          icon: Archive },
+  { href: "/supplier",             label: "Supplier",            icon: Building2 },
   { href: "/warranty",             label: "Garansi",             icon: ShieldCheck },
   { href: "/user-management",      label: "Pengaturan Akses",    icon: UserCog },
   { href: "/members",              label: "Member VIP",          icon: Star },
