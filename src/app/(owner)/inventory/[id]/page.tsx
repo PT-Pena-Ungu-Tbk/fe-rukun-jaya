@@ -8,6 +8,7 @@ import { ChevronRight, Printer, Pencil, Plus, TrendingUp, Loader2, X, Save } fro
 import { formatRupiah } from "@/lib/utils";
 import toast from "react-hot-toast";
 import { inventoryApi } from "@/lib/api";
+import { getUser } from "@/lib/auth";
 import type { Product } from "@/types";
 
 export default function ProductDetailPage() {
@@ -20,6 +21,8 @@ export default function ProductDetailPage() {
   const [saving, setSaving] = useState(false);
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
+  const [mounted, setMounted] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
 
   const [form, setForm] = useState({
     name: "",
@@ -43,6 +46,10 @@ export default function ProductDetailPage() {
   }, [id]);
 
   useEffect(() => {
+    setMounted(true);
+    const u = getUser();
+    setIsOwner(u?.role?.toUpperCase() === "OWNER");
+
     fetchProductDetail();
     inventoryApi.getCategories()
       .then((res) => setCategories(res.data || []))
@@ -202,12 +209,16 @@ export default function ProductDetailPage() {
             <button onClick={() => window.print()} className="btn-secondary text-sm">
               <Printer size={14} /> Print Label
             </button>
-            <button onClick={handleOpenEdit} className="btn-secondary text-sm">
-              <Pencil size={14} /> Edit Produk
-            </button>
-            <button onClick={() => setShowAddStockModal(true)} className="btn-primary text-sm">
-              <Plus size={14} /> Tambah Stok
-            </button>
+            {mounted && isOwner && (
+              <>
+                <button onClick={handleOpenEdit} className="btn-secondary text-sm">
+                  <Pencil size={14} /> Edit Produk
+                </button>
+                <button onClick={() => setShowAddStockModal(true)} className="btn-primary text-sm">
+                  <Plus size={14} /> Tambah Stok
+                </button>
+              </>
+            )}
           </div>
         </div>
 

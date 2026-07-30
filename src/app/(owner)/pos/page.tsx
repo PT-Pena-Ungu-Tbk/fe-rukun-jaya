@@ -231,8 +231,9 @@ export default function POSPage() {
           <div class="divider"></div>
           <div class="footer text-center">
             <p class="bold">TERIMA KASIH</p>
-            <p>Atas Kunjungan Anda</p>
-            <p>Barang yang sudah dibeli tidak dapat ditukar/dikembalikan.</p>
+            <p>Atas Kunjungan & Kepercayaan Anda</p>
+            <p style="margin-top: 5px;">Simpan struk ini sebagai bukti garansi &amp; pembelian sah.</p>
+            <p>Klaim garansi/penukaran barang berlaku sesuai syarat &amp; ketentuan toko.</p>
           </div>
           <script>
             window.onload = function() {

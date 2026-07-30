@@ -8,6 +8,7 @@ import Link from "next/link";
 import { formatRupiah } from "@/lib/utils";
 import toast from "react-hot-toast";
 import { inventoryApi } from "@/lib/api";
+import { getUser } from "@/lib/auth";
 import type { Product } from "@/types";
 
 type InventoryItem = Product & { _displayStok?: number };
@@ -47,6 +48,8 @@ export default function InventoryPage() {
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
+  const [mounted, setMounted] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
   const itemsPerPage = 10;
 
   useEffect(() => {
@@ -54,6 +57,10 @@ export default function InventoryPage() {
   }, [search, filterStatus, filterKategori]);
 
   useEffect(() => {
+    setMounted(true);
+    const u = getUser();
+    setIsOwner(u?.role?.toUpperCase() === "OWNER");
+
     setLoading(true);
     inventoryApi.getProducts()
       .then((res) => {
@@ -315,14 +322,16 @@ export default function InventoryPage() {
                 <option>Stok Tersedia</option><option>Stok Rendah</option><option>Stok Habis</option>
               </select>
             </div>
-            <div className="flex items-center gap-2">
-              <Link href="/inventory/bulk-update" className="btn-secondary text-xs py-2">
-                <RefreshCw size={14} /> Perbarui Sekaligus
-              </Link>
-              <button onClick={() => setShowAddModal(true)} className="btn-primary text-xs py-2">
-                <Plus size={14} /> Tambah Barang
-              </button>
-            </div>
+            {mounted && isOwner && (
+              <div className="flex items-center gap-2">
+                <Link href="/inventory/bulk-update" className="btn-secondary text-xs py-2">
+                  <RefreshCw size={14} /> Perbarui Sekaligus
+                </Link>
+                <button onClick={() => setShowAddModal(true)} className="btn-primary text-xs py-2">
+                  <Plus size={14} /> Tambah Barang
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Table */}
@@ -378,18 +387,22 @@ export default function InventoryPage() {
                       </Link>
                     </td>
                     <td>
-                      <div className="flex items-center gap-1">
-                        <button onClick={() => handleOpenEdit(item)}
-                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                          title="Edit Barang">
-                          <Pencil size={13} />
-                        </button>
-                        <button onClick={() => setShowDeleteModal(item)}
-                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                          title="Hapus Barang">
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
+                      {mounted && isOwner ? (
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => handleOpenEdit(item)}
+                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                            title="Edit Barang">
+                            <Pencil size={13} />
+                          </button>
+                          <button onClick={() => setShowDeleteModal(item)}
+                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                            title="Hapus Barang">
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-gray-400 font-mono">-</span>
+                      )}
                     </td>
                   </tr>
                 ))
