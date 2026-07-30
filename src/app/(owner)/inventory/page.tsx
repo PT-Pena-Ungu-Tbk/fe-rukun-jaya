@@ -35,6 +35,7 @@ export default function InventoryPage() {
   const [filterKategori, setFilterKategori] = useState("Semua Kategori");
   const [filterStatus, setFilterStatus] = useState("Semua Status");
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState<InventoryItem | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState<InventoryItem | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
@@ -42,7 +43,6 @@ export default function InventoryPage() {
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const itemsPerPage = 10;
 
   useEffect(() => {
@@ -90,13 +90,57 @@ export default function InventoryPage() {
     akanExpired: 0,
   };
 
-  const isAllSelected = paginatedItems.length > 0 && paginatedItems.every((item) => selectedIds.includes(item.id));
-  const toggleSelectAll = () => {
-    if (isAllSelected) {
-      setSelectedIds((prev) => prev.filter((id) => !paginatedItems.some((item) => item.id === id)));
-    } else {
-      const pageIds = paginatedItems.map((item) => item.id);
-      setSelectedIds((prev) => Array.from(new Set([...prev, ...pageIds])));
+  const handleOpenEdit = (item: InventoryItem) => {
+    setShowEditModal(item);
+    setForm({
+      nama_barang: item.name,
+      sku_code: item.sku_code,
+      category_id: (categories.find(c => c.name === item.category)?.id) || item.category_id || "",
+      supplier_id: (suppliers.find(s => s.name === item.supplier)?.id) || item.supplier_id || "",
+      kondisi: "Baru",
+      jumlah_stok_awal: item.current_stock,
+      satuan: "",
+      kode_rak: item.rack_location || "",
+      harga_beli: Number(item.buy_price || 0),
+      harga_jual: Number(item.sell_price || 0),
+      stok_minimum: item.min_stock || 10,
+      tanggal_kadaluarsa: "",
+    });
+  };
+
+  const handleUpdate = async () => {
+    if (!showEditModal) return;
+    if (!form.nama_barang.trim() || !form.sku_code.trim()) {
+      toast.error("Nama barang dan SKU wajib diisi");
+      return;
+    }
+    if (form.harga_beli <= 0 || form.harga_jual <= 0) {
+      toast.error("Harga beli dan harga jual wajib lebih dari 0");
+      return;
+    }
+    setSaving(true);
+    try {
+      await inventoryApi.updateProduct(showEditModal.id, {
+        sku_code: form.sku_code,
+        name: form.nama_barang,
+        category_id: form.category_id || undefined,
+        supplier_id: form.supplier_id || undefined,
+        buy_price: form.harga_beli,
+        sell_price: form.harga_jual,
+        current_stock: form.jumlah_stok_awal,
+        min_stock: form.stok_minimum,
+        rack_location: form.kode_rak,
+      });
+      toast.success("Barang berhasil diperbarui!");
+      setShowEditModal(null);
+      setForm(emptyForm);
+      const res = await inventoryApi.getProducts();
+      if (res.data) setItems(res.data);
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(msg ?? "Gagal memperbarui barang");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -239,14 +283,6 @@ export default function InventoryPage() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>
-                    <input 
-                      type="checkbox" 
-                      className="rounded cursor-pointer" 
-                      checked={isAllSelected}
-                      onChange={toggleSelectAll}
-                    />
-                  </th>
                   <th>Kode SKU</th>
                   <th>Nama Barang</th>
                   <th>Stok</th>
@@ -259,7 +295,7 @@ export default function InventoryPage() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={9} className="text-center py-8">
+                    <td colSpan={8} className="text-center py-8">
                       <div className="flex flex-col items-center justify-center gap-2">
                         <Loader2 className="animate-spin text-blue-600" size={24} />
                         <span className="text-sm text-gray-500">Memuat data inventaris...</span>
@@ -268,21 +304,13 @@ export default function InventoryPage() {
                   </tr>
                 ) : filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="text-center py-8 text-sm text-gray-400">
+                    <td colSpan={8} className="text-center py-8 text-sm text-gray-400">
                       Belum ada barang di inventaris.
                     </td>
                   </tr>
                 ) : (
                   paginatedItems.map((item) => (
                     <tr key={item.id} className="animate-fade-in">
-                    <td>
-                      <input 
-                        type="checkbox" 
-                        className="rounded cursor-pointer" 
-                        checked={selectedIds.includes(item.id)}
-                        onChange={() => setSelectedIds((prev) => prev.includes(item.id) ? prev.filter((id) => id !== item.id) : [...prev, item.id])}
-                      />
-                    </td>
                     <td className="font-mono text-xs text-gray-750 font-semibold">{item.sku_code}</td>
                     <td>
                       <Link href={`/inventory/${item.id}`} className={`font-medium hover:underline ${item.current_stock === 0 ? "text-red-600" : "text-gray-800"}`}>
@@ -304,11 +332,14 @@ export default function InventoryPage() {
                     </td>
                     <td>
                       <div className="flex items-center gap-1">
-                        <button className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors">
+                        <button onClick={() => handleOpenEdit(item)}
+                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                          title="Edit Barang">
                           <Pencil size={13} />
                         </button>
                         <button onClick={() => setShowDeleteModal(item)}
-                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors">
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                          title="Hapus Barang">
                           <Trash2 size={13} />
                         </button>
                       </div>
@@ -397,7 +428,12 @@ export default function InventoryPage() {
                       </select>
                     </div>
                     <div>
-                      <label className="form-label">Supplier *</label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="form-label mb-0">Supplier *</label>
+                        <Link href="/supplier" target="_blank" className="text-[11px] text-blue-600 hover:underline">
+                          + Kelola Supplier
+                        </Link>
+                      </div>
                       <select value={form.supplier_id} onChange={(e) => setForm({ ...form, supplier_id: e.target.value })}
                         className="form-select text-sm w-full">
                         <option value="">Pilih Supplier</option>
@@ -456,6 +492,107 @@ export default function InventoryPage() {
               <button onClick={handleSave} disabled={saving} className="btn-primary">
                 {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                 Simpan Barang
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 modal-overlay">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl modal-content mx-4">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <h3 className="text-base font-bold text-gray-900">Edit Data Barang</h3>
+              <button onClick={() => { setShowEditModal(null); setForm(emptyForm); }} className="text-gray-400 hover:text-gray-600">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-4 max-h-[70vh] overflow-y-auto">
+              <div>
+                <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-3">Informasi Dasar</p>
+                <div className="space-y-3">
+                  <div>
+                    <label className="form-label">Nama Barang *</label>
+                    <input value={form.nama_barang} onChange={(e) => setForm({ ...form, nama_barang: e.target.value })}
+                      placeholder="Contoh: Semen Gresik 50kg" className="form-input" />
+                  </div>
+                  <div>
+                    <label className="form-label">SKU *</label>
+                    <input value={form.sku_code} onChange={(e) => setForm({ ...form, sku_code: e.target.value })}
+                      placeholder="Contoh: SMN-GRSK-50" className="form-input font-mono" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="form-label">Kategori *</label>
+                      <select value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })}
+                        className="form-select text-sm w-full">
+                        <option value="">Pilih Kategori</option>
+                        {categories.map((c) => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="form-label mb-0">Supplier *</label>
+                        <Link href="/supplier" target="_blank" className="text-[11px] text-blue-600 hover:underline">
+                          + Kelola Supplier
+                        </Link>
+                      </div>
+                      <select value={form.supplier_id} onChange={(e) => setForm({ ...form, supplier_id: e.target.value })}
+                        className="form-select text-sm w-full">
+                        <option value="">Pilih Supplier</option>
+                        {suppliers.map((s) => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-3">Stok & Harga</p>
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="form-label">Jumlah Stok *</label>
+                      <input type="number" value={form.jumlah_stok_awal} onChange={(e) => setForm({ ...form, jumlah_stok_awal: +e.target.value })}
+                        className="form-input" min={0} />
+                    </div>
+                    <div>
+                      <label className="form-label">Stok Minimum</label>
+                      <input type="number" value={form.stok_minimum} onChange={(e) => setForm({ ...form, stok_minimum: +e.target.value })}
+                        className="form-input" min={0} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="form-label">Kode Rak / Lokasi</label>
+                      <input value={form.kode_rak} onChange={(e) => setForm({ ...form, kode_rak: e.target.value })}
+                        placeholder="CONTOH: A1-01" className="form-input" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="form-label">Harga Beli (Rp) *</label>
+                      <input type="number" value={form.harga_beli} onChange={(e) => setForm({ ...form, harga_beli: +e.target.value })}
+                        placeholder="Rp 0" className="form-input" />
+                    </div>
+                    <div>
+                      <label className="form-label">Harga Jual (Rp) *</label>
+                      <input type="number" value={form.harga_jual} onChange={(e) => setForm({ ...form, harga_jual: +e.target.value })}
+                        placeholder="Rp 0" className="form-input" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100">
+              <button onClick={() => { setShowEditModal(null); setForm(emptyForm); }} className="btn-secondary">Batal</button>
+              <button onClick={handleUpdate} disabled={saving} className="btn-primary">
+                {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                Simpan Perubahan
               </button>
             </div>
           </div>
