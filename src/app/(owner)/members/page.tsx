@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import TopNav from "@/components/layout/TopNav";
-import { Plus, Pencil, Trash2, X, Loader2, AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Pencil, Trash2, X, Loader2, AlertTriangle, ChevronLeft, ChevronRight, Download } from "lucide-react";
 import toast from "react-hot-toast";
 import type { VipMember } from "@/types";
 import { membersApi } from "@/lib/api";
@@ -128,6 +128,24 @@ export default function MembersPage() {
     }
   };
 
+  const handleExportExcel = async () => {
+    try {
+      toast.loading("Mengunduh data Member VIP...", { id: "export-vip" });
+      const blob = await membersApi.exportVipMembers();
+      const url = window.URL.createObjectURL(new Blob([blob as any]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `Data_Member_VIP_${Date.now()}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast.success("File Excel Member VIP berhasil diunduh!", { id: "export-vip" });
+    } catch (err) {
+      console.error(err);
+      toast.error("Gagal mengunduh file Excel", { id: "export-vip" });
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col min-h-screen">
       <TopNav />
@@ -138,9 +156,14 @@ export default function MembersPage() {
             <h1 className="text-2xl font-bold text-gray-900">Manajemen Member VIP</h1>
             <p className="text-sm text-gray-500 mt-0.5">Kelola dan pantau program loyalitas pelanggan.</p>
           </div>
-          <button onClick={() => setShowAddModal(true)} className="btn-primary text-sm">
-            <Plus size={15} /> Tambah Member Baru
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={handleExportExcel} className="btn-secondary text-sm">
+              <Download size={15} /> Ekspor Excel
+            </button>
+            <button onClick={() => setShowAddModal(true)} className="btn-primary text-sm">
+              <Plus size={15} /> Tambah Member Baru
+            </button>
+          </div>
         </div>
 
         {/* Table */}
