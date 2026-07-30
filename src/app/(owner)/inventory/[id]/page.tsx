@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import TopNav from "@/components/layout/TopNav";
 import Link from "next/link";
@@ -33,14 +33,14 @@ export default function ProductDetailPage() {
     rack_location: "",
   });
 
-  const fetchProductDetail = () => {
+  const fetchProductDetail = useCallback(() => {
     if (!id || Array.isArray(id)) return;
     setLoading(true);
     inventoryApi.getProduct(id)
       .then((res) => setProduct(res.data))
       .catch(() => setProduct(null))
       .finally(() => setLoading(false));
-  };
+  }, [id]);
 
   useEffect(() => {
     fetchProductDetail();
@@ -51,7 +51,7 @@ export default function ProductDetailPage() {
     inventoryApi.getSuppliers()
       .then((res) => setSuppliers(res.data || []))
       .catch((err) => console.error("Gagal memuat supplier:", err));
-  }, [id]);
+  }, [fetchProductDetail]);
 
   const handleOpenEdit = () => {
     if (!product) return;
@@ -352,7 +352,12 @@ export default function ProductDetailPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="form-label">Kategori *</label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="form-label mb-0">Kategori *</label>
+                        <Link href="/inventory" target="_blank" className="text-[11px] text-blue-600 hover:underline">
+                          + Kelola Kategori
+                        </Link>
+                      </div>
                       <select value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })}
                         className="form-select text-sm w-full">
                         <option value="">Pilih Kategori</option>

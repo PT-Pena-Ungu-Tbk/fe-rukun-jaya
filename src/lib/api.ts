@@ -106,6 +106,18 @@ export const inventoryApi = {
   getCategories: () =>
     apiClient.get<ApiOk<{ id: string; name: string }[]>>("/categories").then((r) => r.data),
 
+  /** POST /categories */
+  createCategory: (name: string) =>
+    apiClient.post<ApiOk<{ id: string; name: string }>>("/categories", { name }).then((r) => r.data),
+
+  /** PUT /categories/:id */
+  updateCategory: (id: string, name: string) =>
+    apiClient.put<ApiOk<{ id: string; name: string }>>(`/categories/${id}`, { name }).then((r) => r.data),
+
+  /** DELETE /categories/:id */
+  deleteCategory: (id: string) =>
+    apiClient.delete<ApiMsg>(`/categories/${id}`).then((r) => r.data),
+
   /** GET /suppliers */
   getSuppliers: () =>
     apiClient.get<ApiOk<{ id: string; name: string; contact_info?: string }[]>>("/suppliers").then((r) => r.data),
@@ -127,6 +139,8 @@ export const membersApi = {
     apiClient.delete<ApiMsg>(`/members/vip/${id}`).then((r) => r.data),
   redeemPoints: (memberId: string, data: { poin_ditukar: number; jenis_penukaran: string; transaction_id?: string }) =>
     apiClient.post<ApiMsg & { sisa_poin?: number }>(`/members/vip/${memberId}/redeem`, data).then((r) => r.data),
+  exportVipMembers: () =>
+    apiClient.get<Blob>("/members/vip/export", { responseType: "blob" }).then((r) => r.data),
 };
 
 // ─── TRANSACTIONS ─────────────────────────────────────────────────────────────

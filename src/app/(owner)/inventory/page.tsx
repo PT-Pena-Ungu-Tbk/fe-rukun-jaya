@@ -37,6 +37,10 @@ export default function InventoryPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState<InventoryItem | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState<InventoryItem | null>(null);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [newCatName, setNewCatName] = useState("");
+  const [editingCat, setEditingCat] = useState<{ id: string; name: string } | null>(null);
+  const [catSaving, setCatSaving] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -62,14 +66,18 @@ export default function InventoryPage() {
       })
       .finally(() => setLoading(false));
 
-    inventoryApi.getCategories()
-      .then((res) => setCategories(res.data || []))
-      .catch((err) => console.error("Gagal memuat kategori:", err));
+    fetchCategories();
 
     inventoryApi.getSuppliers()
       .then((res) => setSuppliers(res.data || []))
       .catch((err) => console.error("Gagal memuat supplier:", err));
   }, []);
+
+  const fetchCategories = () => {
+    inventoryApi.getCategories()
+      .then((res) => setCategories(res.data || []))
+      .catch((err) => console.error("Gagal memuat kategori:", err));
+  };
 
   const filtered = items.filter((item) => {
     const matchSearch = item.name.toLowerCase().includes(search.toLowerCase()) || item.id.toLowerCase().includes(search.toLowerCase()) || item.sku_code.toLowerCase().includes(search.toLowerCase());
@@ -141,6 +149,45 @@ export default function InventoryPage() {
       toast.error(msg ?? "Gagal memperbarui barang");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleCreateCat = async () => {
+    if (!newCatName.trim()) { toast.error("Nama kategori wajib diisi"); return; }
+    setCatSaving(true);
+    try {
+      await inventoryApi.createCategory(newCatName.trim());
+      toast.success("Kategori berhasil ditambahkan!");
+      setNewCatName("");
+      fetchCategories();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(msg ?? "Gagal menambahkan kategori");
+    } finally { setCatSaving(false); }
+  };
+
+  const handleUpdateCat = async () => {
+    if (!editingCat || !editingCat.name.trim()) return;
+    setCatSaving(true);
+    try {
+      await inventoryApi.updateCategory(editingCat.id, editingCat.name.trim());
+      toast.success("Kategori berhasil diperbarui!");
+      setEditingCat(null);
+      fetchCategories();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(msg ?? "Gagal memperbarui kategori");
+    } finally { setCatSaving(false); }
+  };
+
+  const handleDeleteCat = async (catId: string) => {
+    try {
+      await inventoryApi.deleteCategory(catId);
+      toast.success("Kategori berhasil dihapus");
+      fetchCategories();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(msg ?? "Gagal menghapus kategori");
     }
   };
 
@@ -418,7 +465,12 @@ export default function InventoryPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="form-label">Kategori *</label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="form-label mb-0">Kategori *</label>
+                        <button type="button" onClick={() => setShowCategoryModal(true)} className="text-[11px] text-blue-600 hover:underline">
+                          + Kelola Kategori
+                        </button>
+                      </div>
                       <select value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })}
                         className="form-select text-sm w-full">
                         <option value="">Pilih Kategori</option>
@@ -524,7 +576,12 @@ export default function InventoryPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="form-label">Kategori *</label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="form-label mb-0">Kategori *</label>
+                        <button type="button" onClick={() => setShowCategoryModal(true)} className="text-[11px] text-blue-600 hover:underline">
+                          + Kelola Kategori
+                        </button>
+                      </div>
                       <select value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })}
                         className="form-select text-sm w-full">
                         <option value="">Pilih Kategori</option>
@@ -593,6 +650,86 @@ export default function InventoryPage() {
               <button onClick={handleUpdate} disabled={saving} className="btn-primary">
                 {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                 Simpan Perubahan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Category Management Modal */}
+      {showCategoryModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 modal-overlay p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl modal-content overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50">
+              <h3 className="text-base font-bold text-gray-900">Kelola Kategori Barang</h3>
+              <button onClick={() => { setShowCategoryModal(false); setEditingCat(null); }} className="text-gray-400 hover:text-gray-600">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+              {/* Form Add / Edit */}
+              <div className="bg-blue-50/60 border border-blue-100 rounded-xl p-3.5 space-y-2">
+                <label className="form-label text-xs">
+                  {editingCat ? "Edit Nama Kategori" : "Tambah Kategori Baru"}
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Contoh: Bahan Bangunan Basah"
+                    value={editingCat ? editingCat.name : newCatName}
+                    onChange={(e) => editingCat ? setEditingCat({ ...editingCat, name: e.target.value }) : setNewCatName(e.target.value)}
+                    className="form-input text-sm py-1.5 flex-1"
+                  />
+                  {editingCat ? (
+                    <>
+                      <button onClick={handleUpdateCat} disabled={catSaving} className="btn-primary text-xs py-1.5">
+                        {catSaving ? <Loader2 size={13} className="animate-spin" /> : "Simpan"}
+                      </button>
+                      <button onClick={() => setEditingCat(null)} className="btn-secondary text-xs py-1.5">
+                        Batal
+                      </button>
+                    </>
+                  ) : (
+                    <button onClick={handleCreateCat} disabled={catSaving} className="btn-primary text-xs py-1.5">
+                      {catSaving ? <Loader2 size={13} className="animate-spin" /> : <><Plus size={13} /> Tambah</>}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Category List */}
+              <div className="space-y-1.5">
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Daftar Kategori Aktif ({categories.length})</p>
+                {categories.length === 0 ? (
+                  <p className="text-xs text-gray-400 text-center py-4">Belum ada kategori.</p>
+                ) : (
+                  categories.map((c) => (
+                    <div key={c.id} className="flex items-center justify-between p-2.5 bg-gray-50 hover:bg-gray-100/80 rounded-xl transition-colors">
+                      <span className="text-sm font-medium text-gray-800">{c.name}</span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => setEditingCat({ id: c.id, name: c.name })}
+                          className="p-1 text-gray-400 hover:text-blue-600 rounded transition-colors"
+                          title="Edit Kategori">
+                          <Pencil size={13} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteCat(c.id)}
+                          className="p-1 text-gray-400 hover:text-red-600 rounded transition-colors"
+                          title="Hapus Kategori">
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end px-6 py-3 border-t border-gray-100 bg-gray-50">
+              <button onClick={() => { setShowCategoryModal(false); setEditingCat(null); }} className="btn-secondary text-xs py-1.5">
+                Selesai
               </button>
             </div>
           </div>
