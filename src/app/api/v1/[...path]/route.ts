@@ -18,13 +18,7 @@ async function proxy(req: NextRequest, { params }: { params: Promise<{ path: str
 
   const { path } = await params;
   const url = new URL(req.url);
-  let target = "";
-  if (path[0] === "suppliers") {
-    const backendWithoutV1 = BACKEND.replace(/\/v1$/, "");
-    target = `${backendWithoutV1}/suppliers${path.slice(1).length > 0 ? "/" + path.slice(1).join("/") : ""}${url.search}`;
-  } else {
-    target = `${BACKEND}/${path.join("/")}${url.search}`;
-  }
+  const target = `${BACKEND}/${path.join("/")}${url.search}`;
 
   // Forward headers tapi hapus host (biar ga conflict)
   const headers = new Headers();

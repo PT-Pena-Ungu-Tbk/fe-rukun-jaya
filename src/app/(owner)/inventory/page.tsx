@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import TopNav from "@/components/layout/TopNav";
-import { Plus, Pencil, Trash2, Ban, ChevronDown, X, Save, Loader2, AlertTriangle, RefreshCw } from "lucide-react";
+import { Plus, Pencil, Trash2, Ban, ChevronDown, X, Save, Loader2, AlertTriangle, RefreshCw, Search } from "lucide-react";
 // ChevronDown reused as "trending down" icon for stat cards
 import Link from "next/link";
 import { formatRupiah } from "@/lib/utils";
@@ -42,6 +42,7 @@ export default function InventoryPage() {
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const itemsPerPage = 10;
 
   useEffect(() => {
@@ -76,7 +77,7 @@ export default function InventoryPage() {
       (filterStatus === "Stok Habis" && item.current_stock === 0) ||
       (filterStatus === "Stok Rendah" && item.current_stock > 0 && item.current_stock <= item.min_stock) ||
       (filterStatus === "Stok Tersedia" && item.current_stock > item.min_stock);
-    const matchKategori = filterKategori === "Semua Kategori" || item.category === filterKategori;
+    const matchKategori = filterKategori === "Semua Kategori" || item.category === filterKategori || (item as any).category_name === filterKategori;
     return matchSearch && matchStatus && matchKategori;
   });
 
@@ -87,6 +88,16 @@ export default function InventoryPage() {
     stokHabis: items.filter((i) => i.current_stock === 0).length,
     dibawahMin: items.filter((i) => i.current_stock > 0 && i.current_stock <= i.min_stock).length,
     akanExpired: 0,
+  };
+
+  const isAllSelected = paginatedItems.length > 0 && paginatedItems.every((item) => selectedIds.includes(item.id));
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedIds((prev) => prev.filter((id) => !paginatedItems.some((item) => item.id === id)));
+    } else {
+      const pageIds = paginatedItems.map((item) => item.id);
+      setSelectedIds((prev) => Array.from(new Set([...prev, ...pageIds])));
+    }
   };
 
   const handleSave = async () => {
@@ -190,6 +201,16 @@ export default function InventoryPage() {
           {/* Toolbar */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
             <div className="flex items-center gap-2">
+              <div className="relative">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Cari barang atau SKU..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="form-input text-sm py-2 pl-9 pr-3 w-56"
+                />
+              </div>
               <select value={filterKategori} onChange={(e) => setFilterKategori(e.target.value)}
                 className="form-select text-sm py-2">
                 <option value="Semua Kategori">Semua Kategori</option>
@@ -218,7 +239,14 @@ export default function InventoryPage() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th><input type="checkbox" className="rounded" /></th>
+                  <th>
+                    <input 
+                      type="checkbox" 
+                      className="rounded cursor-pointer" 
+                      checked={isAllSelected}
+                      onChange={toggleSelectAll}
+                    />
+                  </th>
                   <th>Kode SKU</th>
                   <th>Nama Barang</th>
                   <th>Stok</th>
@@ -247,7 +275,14 @@ export default function InventoryPage() {
                 ) : (
                   paginatedItems.map((item) => (
                     <tr key={item.id} className="animate-fade-in">
-                    <td><input type="checkbox" className="rounded" /></td>
+                    <td>
+                      <input 
+                        type="checkbox" 
+                        className="rounded cursor-pointer" 
+                        checked={selectedIds.includes(item.id)}
+                        onChange={() => setSelectedIds((prev) => prev.includes(item.id) ? prev.filter((id) => id !== item.id) : [...prev, item.id])}
+                      />
+                    </td>
                     <td className="font-mono text-xs text-gray-750 font-semibold">{item.sku_code}</td>
                     <td>
                       <Link href={`/inventory/${item.id}`} className={`font-medium hover:underline ${item.current_stock === 0 ? "text-red-600" : "text-gray-800"}`}>
