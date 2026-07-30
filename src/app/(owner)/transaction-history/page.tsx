@@ -353,15 +353,20 @@ export default function TransactionHistoryPage() {
                 <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Item Belanja</h4>
                 <div className="border border-gray-100 rounded-xl overflow-hidden divide-y divide-gray-100 text-xs">
                   {selectedTx.raw?.items && selectedTx.raw.items.length > 0 ? (
-                    selectedTx.raw.items.map((item: any, idx: number) => (
-                      <div key={idx} className="flex justify-between items-center p-3 hover:bg-gray-50">
-                        <div>
-                          <p className="font-medium text-gray-800">{item.product_name}</p>
-                          <p className="text-gray-400 text-[11px]">{formatRupiah(Number(item.unit_price))} x {item.quantity}</p>
+                    selectedTx.raw.items.map((item: any, idx: number) => {
+                      const qty = Number(item.quantity ?? item.qty ?? 1);
+                      const unitPrice = Number(item.unit_price ?? item.harga_satuan ?? 0);
+                      const subtotal = Number(item.subtotal ?? item.total_harga ?? (unitPrice * qty));
+                      return (
+                        <div key={idx} className="flex justify-between items-center p-3 hover:bg-gray-50">
+                          <div>
+                            <p className="font-medium text-gray-800">{item.product_name || item.nama || "Produk"}</p>
+                            <p className="text-gray-400 text-[11px]">{formatRupiah(unitPrice)} × {qty}</p>
+                          </div>
+                          <p className="font-semibold text-gray-900">{formatRupiah(subtotal)}</p>
                         </div>
-                        <p className="font-semibold text-gray-900">{formatRupiah(Number(item.subtotal))}</p>
-                      </div>
-                    ))
+                      );
+                    })
                   ) : (
                     <p className="p-3 text-gray-400 text-center">{selectedTx.items}</p>
                   )}
