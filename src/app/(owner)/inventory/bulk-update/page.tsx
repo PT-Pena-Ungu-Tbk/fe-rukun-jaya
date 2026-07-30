@@ -10,6 +10,7 @@ import { inventoryApi } from "@/lib/api";
 
 interface BulkItem {
   item_id: string;
+  sku: string;
   nama_barang: string;
   stok_sistem: number;
   stok_fisik_baru: number;
@@ -31,6 +32,7 @@ export default function BulkUpdatePage() {
         if (res.data?.length) {
           setItems(res.data.map((p) => ({
             item_id: p.id,
+            sku: p.sku_code || "",
             nama_barang: p.name,
             stok_sistem: p.current_stock,
             stok_fisik_baru: p.current_stock,
@@ -157,6 +159,11 @@ export default function BulkUpdatePage() {
           ))}
         </div>
 
+        {/* Hint Info */}
+        <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded-xl mb-4 text-xs font-medium flex items-center justify-between">
+          <span>💡 <strong>Petunjuk Excel:</strong> Pengisian data pada template Excel cukup menggunakan <strong>Kode SKU / Barcode</strong> barang. Anda tidak perlu memasukkan kode ID hash sistem.</span>
+        </div>
+
         {/* Table */}
         <div className="page-card animate-slide-up stagger-2">
           <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
@@ -177,8 +184,7 @@ export default function BulkUpdatePage() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th><input type="checkbox" className="rounded" /></th>
-                  <th>ID Barang</th>
+                  <th>Kode SKU</th>
                   <th>Nama Barang</th>
                   <th>Stok Sistem</th>
                   <th>Stok Fisik Baru</th>
@@ -189,7 +195,7 @@ export default function BulkUpdatePage() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={7} className="px-5 py-10 text-center text-gray-500">
+                    <td colSpan={6} className="px-5 py-10 text-center text-gray-500">
                       <div className="flex items-center justify-center gap-2">
                         <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
                         <span>Memuat data inventaris...</span>
@@ -198,7 +204,7 @@ export default function BulkUpdatePage() {
                   </tr>
                 ) : items.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-5 py-10 text-center text-gray-400 text-sm">
+                    <td colSpan={6} className="px-5 py-10 text-center text-gray-400 text-sm">
                       Tidak ada barang di inventaris.
                     </td>
                   </tr>
@@ -207,10 +213,9 @@ export default function BulkUpdatePage() {
                     const selisih = item.stok_fisik_baru - item.stok_sistem;
                     return (
                       <tr key={item.item_id} className="animate-fade-in">
-                        <td><input type="checkbox" className="rounded" /></td>
                         <td>
                           <Link href={`/inventory/${item.item_id}`} className="font-mono text-sm font-semibold text-blue-600 hover:underline">
-                            {item.item_id}
+                            {item.sku || item.item_id}
                           </Link>
                         </td>
                         <td className="text-gray-800 font-medium">{item.nama_barang}</td>
